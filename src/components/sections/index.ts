@@ -1,0 +1,8 @@
+export { Hero } from './Hero'
+export { Features } from './Features'
+export { About } from './About'
+export { Stats } from './Stats'
+export { CTABanner } from './CTABanner'
+export { ServicesGrid } from './ServicesGrid'
+export { ContactForm } from './ContactForm'
+export { Clients } from './Clients'
