@@ -3,18 +3,10 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import dotenv from 'dotenv'
 
-const filename = fileURLToPath(import.meta.url)
-const dirname = path.dirname(filename)
+import type { Payload } from 'payload'
 
-dotenv.config({
-  path: path.resolve(dirname, '../../.env'),
-})
-
-async function seed() {
+export const seed = async (payload: Payload) => {
   try {
-    const { default: configPromise } = await import('@payload-config')
-    const payload = await getPayload({ config: configPromise })
-
     console.log('Starting content seeding...')
 
     // 1. Seed Categories
@@ -358,11 +350,30 @@ async function seed() {
     }
 
     console.log('Seed content completed successfully!')
-    process.exit(0)
   } catch (error) {
     console.error('Error seeding content:', error)
-    process.exit(1)
+    throw error
   }
 }
 
-seed()
+// Run if called directly via script
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const run = async () => {
+    const filename = fileURLToPath(import.meta.url)
+    const dirname = path.dirname(filename)
+
+    dotenv.config({
+      path: path.resolve(dirname, '../../.env'),
+    })
+
+    const { default: configPromise } = await import('@payload-config')
+    const payload = await getPayload({ config: configPromise })
+    await seed(payload)
+    process.exit(0)
+  }
+
+  run().catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })
+}

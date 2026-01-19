@@ -19,6 +19,7 @@ import { Jobs } from './collections/Jobs'
 import { SiteSettings } from './globals/SiteSettings'
 import { Navigation } from './globals/Navigation'
 import { Footer } from './globals/Footer'
+import { SeedButton } from './components/Admin/SeedButton'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -31,6 +32,9 @@ export default buildConfig({
     },
     meta: {
       titleSuffix: '- Consulting CMS',
+    },
+    components: {
+      beforeDashboard: [SeedButton as any],
     },
   },
   collections: [Users, Media, Pages, Services, Categories, Jobs],
