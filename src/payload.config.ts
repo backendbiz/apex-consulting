@@ -4,6 +4,8 @@ import path from 'path'
 import { buildConfig } from 'payload'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
+import { s3Storage } from '@payloadcms/storage-s3'
+import { resendAdapter } from '@payloadcms/email-resend'
 
 // Collections
 import { Users } from './collections/Users'
@@ -43,5 +45,25 @@ export default buildConfig({
     url: process.env.DATABASE_URI || '',
   }),
   sharp,
-  plugins: [],
+  plugins: [
+    s3Storage({
+      collections: {
+        media: true,
+      },
+      bucket: process.env.S3_BUCKET || '',
+      config: {
+        credentials: {
+          accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
+          secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
+        },
+        region: process.env.S3_REGION || '',
+        // endpoint: process.env.S3_ENDPOINT, // Optional
+      },
+    }),
+  ],
+  email: resendAdapter({
+    defaultFromAddress: 'onboarding@resend.dev',
+    defaultFromName: 'Apex Consulting',
+    apiKey: process.env.RESEND_API_KEY || '',
+  }),
 })
