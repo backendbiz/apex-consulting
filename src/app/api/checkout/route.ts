@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server'
 export async function POST(req: Request) {
   try {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       apiVersion: '2024-12-18.acacia' as any,
     })
 
@@ -60,8 +61,9 @@ export async function POST(req: Request) {
     })
 
     return NextResponse.json({ sessionId: session.id, url: session.url })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating checkout session:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

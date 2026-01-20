@@ -37,7 +37,8 @@ export default async function ProjectsPage() {
           </h1>
           <div className="h-1 w-20 bg-blue-500 mt-6 rounded-full"></div>
           <p className="mt-6 max-w-2xl text-lg text-gray-300">
-            Discover how we've helped businesses transform and grow through innovative solutions.
+            Discover how we&apos;ve helped businesses transform and grow through innovative
+            solutions.
           </p>
         </div>
       </section>

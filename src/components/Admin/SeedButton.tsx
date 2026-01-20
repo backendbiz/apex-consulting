@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { seedDatabase } from '@/actions/seed'
 
-export const SeedButton: React.FC<any> = () => {
+export const SeedButton: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState(false)
@@ -28,7 +28,7 @@ export const SeedButton: React.FC<any> = () => {
         setError(true)
         setMessage(result.message)
       }
-    } catch (e) {
+    } catch {
       setError(true)
       setMessage('An error occurred.')
     } finally {

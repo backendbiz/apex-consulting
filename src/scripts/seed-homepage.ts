@@ -32,14 +32,12 @@ async function seed() {
       await payload.update({
         collection: 'pages',
         id: existingPages.docs[0].id,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: getHomePageData(),
       })
     } else {
       console.log('Creating Home page...')
       await payload.create({
         collection: 'pages',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: getHomePageData(),
       })
     }

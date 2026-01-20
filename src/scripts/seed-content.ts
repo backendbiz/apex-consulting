@@ -479,11 +479,13 @@ export const seed = async (payload: Payload) => {
         }
 
         // Remove helper prop
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         delete (projectData as any).categorySlugs
 
         if (defaultMediaId) {
           await payload.create({
             collection: 'projects',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             data: projectData as any,
           })
         } else {

@@ -1,5 +1,6 @@
 import { getPayloadClient } from '@/lib/payload'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const checkoutSessionCompleted = async ({ event }: any) => {
   const session = event.data.object
   const { serviceId } = session.metadata || {}

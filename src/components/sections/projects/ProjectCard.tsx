@@ -3,7 +3,7 @@
 import React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Project, Media } from '@/payload-types'
+import { Project } from '@/payload-types'
 import { cn } from '@/utils/cn'
 
 interface ProjectCardProps {

@@ -1,7 +1,7 @@
 import type { CollectionAfterChangeHook, GlobalAfterChangeHook } from 'payload'
 import { revalidatePath } from 'next/cache'
 
-export const revalidate: CollectionAfterChangeHook = ({ doc, req, operation }) => {
+export const revalidate: CollectionAfterChangeHook = ({ doc, req, operation: _operation }) => {
   req.payload.logger.info(`Revalidating path...`)
 
   try {
