@@ -54,6 +54,7 @@ export default async function CareerPage() {
     description: job.description,
     responsibilities: job.responsibilities?.map((r) => r.text || '').filter(Boolean) || [],
     requirements: job.requirements?.map((r) => r.text || '').filter(Boolean) || [],
+    slug: job.slug,
   }))
 
   return (

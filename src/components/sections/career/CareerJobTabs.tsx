@@ -12,6 +12,7 @@ export interface Job {
   description: string
   requirements: string[]
   responsibilities: string[]
+  slug?: string | null
 }
 
 interface CareerJobTabsProps {
@@ -101,10 +102,19 @@ export function CareerJobTabs({ jobs }: CareerJobTabsProps) {
                 </ul>
               </div>
 
-              <div className="pt-4 border-t border-gray-100 mt-6">
+              <div className="flex gap-4">
                 <Button variant="primary" className="rounded! px-8 bg-blue-500 hover:bg-blue-600">
                   Apply Now
                 </Button>
+                {selectedJob.slug && (
+                  <Button
+                    variant="outline"
+                    href={`/career/${selectedJob.slug}`}
+                    className="rounded! px-8"
+                  >
+                    View Details
+                  </Button>
+                )}
               </div>
             </div>
           </div>
