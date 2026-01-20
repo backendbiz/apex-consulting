@@ -39,7 +39,7 @@ export default buildConfig({
       titleSuffix: '- Consulting CMS',
     },
     components: {
-      beforeDashboard: [SeedButton as any],
+      // beforeDashboard: [SeedButton as any],
     },
   },
   collections: [Users, Media, Pages, Services, Categories, Jobs, Orders, ContactRequests, Projects],
