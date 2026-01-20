@@ -93,6 +93,9 @@ export default async function FrontendLayout({ children }: { children: React.Rea
         }
       : null
 
+  const hasTopBar = siteSettings?.phone || siteSettings?.email
+  const paddingTopClass = hasTopBar ? 'pt-[70px] md:pt-[115px]' : 'pt-[70px]'
+
   return (
     <html lang="en" className={`${montserrat.variable} ${openSans.variable}`}>
       <body className="antialiased">
@@ -115,7 +118,7 @@ export default async function FrontendLayout({ children }: { children: React.Rea
             address: siteSettings.address || undefined,
           }}
         />
-        <main className="pt-[70px] md:pt-[130px]">{children}</main>
+        <main className={paddingTopClass}>{children}</main>
         <Footer
           siteName={siteSettings.siteName}
           logo={logo}
