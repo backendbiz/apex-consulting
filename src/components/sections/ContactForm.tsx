@@ -21,15 +21,61 @@ export function ContactForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
 
+  const [file, setFile] = useState<File | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setError(null)
 
-    // Simulate form submission
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    try {
+      const formData = new FormData(e.currentTarget)
+      const data = Object.fromEntries(formData.entries())
 
-    setIsSubmitting(false)
-    setIsSubmitted(true)
+      let imageId = undefined
+
+      // Upload image if present
+      if (file) {
+        const mediaFormData = new FormData()
+        mediaFormData.append('file', file)
+
+        const mediaRes = await fetch('/api/media', {
+          method: 'POST',
+          body: mediaFormData,
+        })
+
+        if (!mediaRes.ok) throw new Error('Failed to upload image')
+
+        const mediaJson = await mediaRes.json()
+        imageId = mediaJson.doc.id
+      }
+
+      // Submit contact request
+      const res = await fetch('/api/contact-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: data.fullName,
+          email: data.email,
+          phone: data.phone,
+          subject: data.subject,
+          details: data.details,
+          image: imageId,
+        }),
+      })
+
+      if (!res.ok) throw new Error('Failed to submit request')
+
+      setIsSubmitted(true)
+    } catch (err) {
+      console.error(err)
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -73,8 +119,11 @@ export function ContactForm({
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="rounded-lg bg-white p-8 shadow-lg">
+                {error && (
+                  <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-500">{error}</div>
+                )}
                 <div className="grid gap-5 md:grid-cols-2">
-                  <Input name="name" placeholder="Your Name" required disabled={isSubmitting} />
+                  <Input name="fullName" placeholder="Your Name" required disabled={isSubmitting} />
                   <Input
                     name="phone"
                     type="tel"
@@ -96,10 +145,22 @@ export function ContactForm({
                 </div>
                 <div className="mt-5">
                   <Textarea
-                    name="message"
+                    name="details"
                     placeholder="Your Message"
                     rows={5}
                     required
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div className="mt-5">
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Attachment (Optional)
+                  </label>
+                  <input
+                    type="file"
+                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                    className="w-full rounded border border-gray-200 bg-white px-5 py-3.75 text-[0.9375rem] file:mr-4 file:rounded-full file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-[3px] focus:ring-blue-500/10"
+                    accept="image/*"
                     disabled={isSubmitting}
                   />
                 </div>

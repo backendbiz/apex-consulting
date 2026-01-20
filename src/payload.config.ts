@@ -17,6 +17,7 @@ import { Services } from './collections/Services'
 import { Categories } from './collections/Categories'
 import { Jobs } from './collections/Jobs'
 import { Orders } from './collections/Orders'
+import { ContactRequests } from './collections/ContactRequests'
 
 // Globals
 import { SiteSettings } from './globals/SiteSettings'
@@ -40,7 +41,7 @@ export default buildConfig({
       beforeDashboard: [SeedButton as any],
     },
   },
-  collections: [Users, Media, Pages, Services, Categories, Jobs, Orders],
+  collections: [Users, Media, Pages, Services, Categories, Jobs, Orders, ContactRequests],
 
   globals: [SiteSettings, Navigation, Footer],
   editor: lexicalEditor(),
