@@ -6,6 +6,8 @@ import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 import { s3Storage } from '@payloadcms/storage-s3'
 import { resendAdapter } from '@payloadcms/email-resend'
+import { stripePlugin } from '@payloadcms/plugin-stripe'
+import { checkoutSessionCompleted } from './stripe/webhooks'
 
 // Collections
 import { Users } from './collections/Users'
@@ -14,6 +16,7 @@ import { Pages } from './collections/Pages'
 import { Services } from './collections/Services'
 import { Categories } from './collections/Categories'
 import { Jobs } from './collections/Jobs'
+import { Orders } from './collections/Orders'
 
 // Globals
 import { SiteSettings } from './globals/SiteSettings'
@@ -37,7 +40,7 @@ export default buildConfig({
       beforeDashboard: [SeedButton as any],
     },
   },
-  collections: [Users, Media, Pages, Services, Categories, Jobs],
+  collections: [Users, Media, Pages, Services, Categories, Jobs, Orders],
 
   globals: [SiteSettings, Navigation, Footer],
   editor: lexicalEditor(),
@@ -63,6 +66,13 @@ export default buildConfig({
           secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
         },
         region: process.env.S3_REGION,
+      },
+    }),
+    stripePlugin({
+      stripeSecretKey: process.env.STRIPE_SECRET_KEY || '',
+      stripeWebhooksEndpointSecret: process.env.STRIPE_WEBHOOKS_ENDPOINT_SECRET || '',
+      webhooks: {
+        'checkout.session.completed': checkoutSessionCompleted,
       },
     }),
   ],

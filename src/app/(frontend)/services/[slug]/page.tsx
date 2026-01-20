@@ -1,5 +1,6 @@
 import { Hero, CTABanner, ContactForm } from '@/components/sections'
 import { Button, Icon, Card, type IconName } from '@/components/ui'
+import { BuyButton } from '@/components/Service/BuyButton'
 import { getPayloadClient } from '@/lib/payload'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
@@ -144,9 +145,7 @@ export default async function ServicePage({ params }: Props) {
                   )}
                 </div>
 
-                <Button variant="primary" href="/contact" className="mb-4 w-full">
-                  Get Started
-                </Button>
+                <BuyButton serviceId={service.id} />
 
                 <Button variant="outline" href="/contact" className="w-full">
                   Request Quote
