@@ -1344,7 +1344,7 @@ export interface Footer {
   quickLinks?:
     | {
         label: string;
-        link: string;
+        page: string | Page;
         id?: string | null;
       }[]
     | null;
@@ -1353,6 +1353,7 @@ export interface Footer {
         city: string;
         address?: string | null;
         phone?: string | null;
+        email?: string | null;
         id?: string | null;
       }[]
     | null;
@@ -1360,7 +1361,7 @@ export interface Footer {
   bottomLinks?:
     | {
         label: string;
-        link: string;
+        page: string | Page;
         id?: string | null;
       }[]
     | null;
@@ -1435,7 +1436,7 @@ export interface FooterSelect<T extends boolean = true> {
     | T
     | {
         label?: T;
-        link?: T;
+        page?: T;
         id?: T;
       };
   offices?:
@@ -1444,6 +1445,7 @@ export interface FooterSelect<T extends boolean = true> {
         city?: T;
         address?: T;
         phone?: T;
+        email?: T;
         id?: T;
       };
   copyrightText?: T;
@@ -1451,7 +1453,7 @@ export interface FooterSelect<T extends boolean = true> {
     | T
     | {
         label?: T;
-        link?: T;
+        page?: T;
         id?: T;
       };
   updatedAt?: T;

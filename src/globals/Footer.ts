@@ -27,8 +27,9 @@ export const Footer: GlobalConfig = {
           required: true,
         },
         {
-          name: 'link',
-          type: 'text',
+          name: 'page',
+          type: 'relationship',
+          relationTo: 'pages',
           required: true,
         },
       ],
@@ -51,6 +52,10 @@ export const Footer: GlobalConfig = {
           name: 'phone',
           type: 'text',
         },
+        {
+          name: 'email',
+          type: 'email',
+        },
       ],
     },
     {
@@ -68,8 +73,9 @@ export const Footer: GlobalConfig = {
           required: true,
         },
         {
-          name: 'link',
-          type: 'text',
+          name: 'page',
+          type: 'relationship',
+          relationTo: 'pages',
           required: true,
         },
       ],

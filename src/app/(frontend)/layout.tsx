@@ -59,22 +59,23 @@ export default async function FrontendLayout({ children }: { children: React.Rea
 
   // Map Footer to Footer Props
   const footerLinks =
-    footer.quickLinks?.map((link: NonNullable<FooterType['quickLinks']>[number]) => ({
+    footer.quickLinks?.map((link: any) => ({
       label: link.label,
-      link: link.link,
+      link: link.page,
     })) || []
 
   const officeLocations =
-    footer.offices?.map((office: NonNullable<FooterType['offices']>[number]) => ({
+    footer.offices?.map((office: any) => ({
       city: office.city,
       address: office.address || undefined,
       phone: office.phone || undefined,
+      email: office.email || undefined,
     })) || []
 
   const bottomLinks =
-    footer.bottomLinks?.map((link: NonNullable<FooterType['bottomLinks']>[number]) => ({
+    footer.bottomLinks?.map((link: any) => ({
       label: link.label,
-      link: link.link,
+      link: link.page,
     })) || []
 
   const socialLinks =
