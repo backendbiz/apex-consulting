@@ -46,7 +46,20 @@ export default async function FrontendLayout({ children }: { children: React.Rea
 
   // Map Navigation to Header Props
   // Map Navigation to Header Props
-  const getLink = (item: any) => {
+  // Map Navigation to Header Props
+  type NavItem = NonNullable<Navigation['mainNav']>[number]
+  type FooterLink = NonNullable<FooterType['quickLinks']>[number]
+  type FooterOffice = NonNullable<FooterType['offices']>[number]
+  type FooterBottomLink = NonNullable<FooterType['bottomLinks']>[number]
+
+  // Shared shape for link items to handle various link types from Payload
+  type LinkItem = {
+    type?: 'internal' | 'external' | null
+    internalLink?: string | { slug?: string } | null
+    externalLink?: string | null
+  }
+
+  const getLink = (item: LinkItem) => {
     if (item.type === 'internal' && item.internalLink) {
       if (typeof item.internalLink === 'string') {
         return `/${item.internalLink}` // Fallback if only ID is present (though unusual for fully populated globals)
@@ -56,25 +69,29 @@ export default async function FrontendLayout({ children }: { children: React.Rea
     return item.externalLink || '#'
   }
 
+  // Helper to extract the array element type from a potential array or undefined/null
+  type ArrayElement<ArrayType> = ArrayType extends (infer ElementType)[] ? ElementType : never
+  type SubItem = ArrayElement<NonNullable<NavItem['subItems']>>
+
   const navItems =
-    navigation.mainNav?.map((item: any) => ({
+    navigation.mainNav?.map((item: NavItem) => ({
       label: item.label,
-      link: getLink(item),
-      subItems: item.subItems?.map((sub: any) => ({
+      link: getLink(item as LinkItem),
+      subItems: item.subItems?.map((sub: SubItem) => ({
         label: sub.label,
-        link: getLink(sub),
+        link: getLink(sub as LinkItem),
       })),
     })) || []
 
   // Map Footer to Footer Props
   const footerLinks =
-    footer.quickLinks?.map((link: any) => ({
+    footer.quickLinks?.map((link: FooterLink) => ({
       label: link.label,
-      link: getLink(link),
+      link: getLink(link as LinkItem),
     })) || []
 
   const officeLocations =
-    footer.offices?.map((office: any) => ({
+    footer.offices?.map((office: FooterOffice) => ({
       city: office.city,
       address: office.address || undefined,
       phone: office.phone || undefined,
@@ -82,9 +99,9 @@ export default async function FrontendLayout({ children }: { children: React.Rea
     })) || []
 
   const bottomLinks =
-    footer.bottomLinks?.map((link: any) => ({
+    footer.bottomLinks?.map((link: FooterBottomLink) => ({
       label: link.label,
-      link: getLink(link),
+      link: getLink(link as LinkItem),
     })) || []
 
   const socialLinks =

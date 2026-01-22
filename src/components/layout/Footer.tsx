@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import Image from 'next/image'
 import { Icon, type IconName } from '@/components/ui'
 import type { Page } from '@/payload-types'
 
@@ -20,8 +19,8 @@ interface FooterProps {
 }
 
 export function Footer({
-  siteName = 'Consulting',
-  logo,
+  siteName: _siteName = 'Consulting',
+  logo: _logo,
   aboutText = 'We provide professional consulting services to help businesses grow and achieve their goals. Our team of experts is dedicated to delivering exceptional results.',
   quickLinks = [],
   offices = [],

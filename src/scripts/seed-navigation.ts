@@ -23,40 +23,41 @@ async function seed() {
         mainNav: [
           {
             label: 'Home',
-            link: '/',
-            type: 'internal',
+            externalLink: '/',
+            type: 'external',
           },
           {
             label: 'About',
-            link: '/about',
-            type: 'internal',
+            externalLink: '/about',
+            type: 'external',
           },
 
           {
             label: 'Services',
-            link: '/services',
-            type: 'internal',
+            externalLink: '/services',
+            type: 'external',
             subItems: [
-              { label: 'Strategy', link: '/services/strategy' },
-              { label: 'Operations', link: '/services/operations' },
-              { label: 'Technology', link: '/services/technology' },
+              { label: 'Strategy', externalLink: '/services/strategy', type: 'external' },
+              { label: 'Operations', externalLink: '/services/operations', type: 'external' },
+              { label: 'Technology', externalLink: '/services/technology', type: 'external' },
             ],
           },
           {
             label: 'Projects',
-            link: '/portfolio',
-            type: 'internal',
+            externalLink: '/portfolio',
+            type: 'external',
           },
           {
             label: 'Contact',
-            link: '/contact',
-            type: 'internal',
+            externalLink: '/contact',
+            type: 'external',
           },
         ],
         ctaButton: {
           enabled: true,
           label: 'Get Consultation',
-          link: '/contact',
+          externalLink: '/contact',
+          type: 'external',
         },
       },
     })
