@@ -386,6 +386,12 @@ export const Pages: CollectionConfig = {
                       required: true,
                     },
                     {
+                      name: 'image',
+                      type: 'upload',
+                      relationTo: 'media',
+                    },
+
+                    {
                       name: 'features',
                       type: 'array',
                       fields: [

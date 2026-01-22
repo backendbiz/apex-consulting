@@ -82,6 +82,11 @@ export const RenderBlocks: React.FC<RenderBlocksProps> = ({ blocks, data }) => {
           sectionLabel={block.sectionLabel || ''}
           heading={block.heading}
           description={block.description}
+          image={
+            typeof block.image === 'object' && block.image && 'url' in block.image
+              ? (block.image.url as string)
+              : undefined
+          }
           features={aboutFeatures}
           ctaText={block.ctaText || ''}
           ctaLink={block.ctaLink || ''}

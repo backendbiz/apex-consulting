@@ -369,6 +369,7 @@ export interface Page {
             sectionLabel?: string | null;
             heading: string;
             description: string;
+            image?: (string | null) | Media;
             features?:
               | {
                   text?: string | null;
@@ -966,6 +967,7 @@ export interface PagesSelect<T extends boolean = true> {
               sectionLabel?: T;
               heading?: T;
               description?: T;
+              image?: T;
               features?:
                 | T
                 | {
