@@ -1314,12 +1314,15 @@ export interface Navigation {
   mainNav?:
     | {
         label: string;
-        link: string;
-        type?: ('internal' | 'external') | null;
+        type: 'internal' | 'external';
+        internalLink?: (string | null) | Page;
+        externalLink?: string | null;
         subItems?:
           | {
               label: string;
-              link: string;
+              type: 'internal' | 'external';
+              internalLink?: (string | null) | Page;
+              externalLink?: string | null;
               id?: string | null;
             }[]
           | null;
@@ -1329,7 +1332,9 @@ export interface Navigation {
   ctaButton?: {
     enabled?: boolean | null;
     label?: string | null;
-    link?: string | null;
+    type?: ('internal' | 'external') | null;
+    internalLink?: (string | null) | Page;
+    externalLink?: string | null;
   };
   updatedAt?: string | null;
   createdAt?: string | null;
@@ -1344,7 +1349,9 @@ export interface Footer {
   quickLinks?:
     | {
         label: string;
-        page: string | Page;
+        type: 'internal' | 'external';
+        internalLink?: (string | null) | Page;
+        externalLink?: string | null;
         id?: string | null;
       }[]
     | null;
@@ -1361,7 +1368,9 @@ export interface Footer {
   bottomLinks?:
     | {
         label: string;
-        page: string | Page;
+        type: 'internal' | 'external';
+        internalLink?: (string | null) | Page;
+        externalLink?: string | null;
         id?: string | null;
       }[]
     | null;
@@ -1404,13 +1413,16 @@ export interface NavigationSelect<T extends boolean = true> {
     | T
     | {
         label?: T;
-        link?: T;
         type?: T;
+        internalLink?: T;
+        externalLink?: T;
         subItems?:
           | T
           | {
               label?: T;
-              link?: T;
+              type?: T;
+              internalLink?: T;
+              externalLink?: T;
               id?: T;
             };
         id?: T;
@@ -1420,7 +1432,9 @@ export interface NavigationSelect<T extends boolean = true> {
     | {
         enabled?: T;
         label?: T;
-        link?: T;
+        type?: T;
+        internalLink?: T;
+        externalLink?: T;
       };
   updatedAt?: T;
   createdAt?: T;
@@ -1436,7 +1450,9 @@ export interface FooterSelect<T extends boolean = true> {
     | T
     | {
         label?: T;
-        page?: T;
+        type?: T;
+        internalLink?: T;
+        externalLink?: T;
         id?: T;
       };
   offices?:
@@ -1453,7 +1469,9 @@ export interface FooterSelect<T extends boolean = true> {
     | T
     | {
         label?: T;
-        page?: T;
+        type?: T;
+        internalLink?: T;
+        externalLink?: T;
         id?: T;
       };
   updatedAt?: T;

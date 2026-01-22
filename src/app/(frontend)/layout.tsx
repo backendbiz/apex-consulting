@@ -45,23 +45,32 @@ export default async function FrontendLayout({ children }: { children: React.Rea
   ])
 
   // Map Navigation to Header Props
+  // Map Navigation to Header Props
+  const getLink = (item: any) => {
+    if (item.type === 'internal' && item.internalLink) {
+      if (typeof item.internalLink === 'string') {
+        return `/${item.internalLink}` // Fallback if only ID is present (though unusual for fully populated globals)
+      }
+      return item.internalLink.slug === 'home' ? '/' : `/${item.internalLink.slug}`
+    }
+    return item.externalLink || '#'
+  }
+
   const navItems =
-    navigation.mainNav?.map((item: NonNullable<Navigation['mainNav']>[number]) => ({
+    navigation.mainNav?.map((item: any) => ({
       label: item.label,
-      link: item.link,
-      subItems: item.subItems?.map(
-        (sub: NonNullable<NonNullable<Navigation['mainNav']>[number]['subItems']>[number]) => ({
-          label: sub.label,
-          link: sub.link,
-        }),
-      ),
+      link: getLink(item),
+      subItems: item.subItems?.map((sub: any) => ({
+        label: sub.label,
+        link: getLink(sub),
+      })),
     })) || []
 
   // Map Footer to Footer Props
   const footerLinks =
     footer.quickLinks?.map((link: any) => ({
       label: link.label,
-      link: link.page,
+      link: getLink(link),
     })) || []
 
   const officeLocations =
@@ -75,7 +84,7 @@ export default async function FrontendLayout({ children }: { children: React.Rea
   const bottomLinks =
     footer.bottomLinks?.map((link: any) => ({
       label: link.label,
-      link: link.page,
+      link: getLink(link),
     })) || []
 
   const socialLinks =
@@ -109,7 +118,7 @@ export default async function FrontendLayout({ children }: { children: React.Rea
               ? {
                   enabled: navigation.ctaButton.enabled ?? false,
                   label: navigation.ctaButton.label || 'Get Consultation',
-                  link: navigation.ctaButton.link || '/contact',
+                  link: getLink(navigation.ctaButton),
                 }
               : undefined
           }

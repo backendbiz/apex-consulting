@@ -27,10 +27,31 @@ export const Footer: GlobalConfig = {
           required: true,
         },
         {
-          name: 'page',
+          name: 'type',
+          type: 'select',
+          options: [
+            { label: 'Internal Link', value: 'internal' },
+            { label: 'External Link', value: 'external' },
+          ],
+          defaultValue: 'internal',
+          required: true,
+        },
+        {
+          name: 'internalLink',
           type: 'relationship',
           relationTo: 'pages',
           required: true,
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === 'internal',
+          },
+        },
+        {
+          name: 'externalLink',
+          type: 'text',
+          required: true,
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === 'external',
+          },
         },
       ],
     },
@@ -73,10 +94,31 @@ export const Footer: GlobalConfig = {
           required: true,
         },
         {
-          name: 'page',
+          name: 'type',
+          type: 'select',
+          options: [
+            { label: 'Internal Link', value: 'internal' },
+            { label: 'External Link', value: 'external' },
+          ],
+          defaultValue: 'internal',
+          required: true,
+        },
+        {
+          name: 'internalLink',
           type: 'relationship',
           relationTo: 'pages',
           required: true,
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === 'internal',
+          },
+        },
+        {
+          name: 'externalLink',
+          type: 'text',
+          required: true,
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === 'external',
+          },
         },
       ],
     },

@@ -22,11 +22,6 @@ export const Navigation: GlobalConfig = {
           required: true,
         },
         {
-          name: 'link',
-          type: 'text',
-          required: true,
-        },
-        {
           name: 'type',
           type: 'select',
           options: [
@@ -34,6 +29,24 @@ export const Navigation: GlobalConfig = {
             { label: 'External Link', value: 'external' },
           ],
           defaultValue: 'internal',
+          required: true,
+        },
+        {
+          name: 'internalLink',
+          type: 'relationship',
+          relationTo: 'pages',
+          required: true,
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === 'internal',
+          },
+        },
+        {
+          name: 'externalLink',
+          type: 'text',
+          required: true,
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === 'external',
+          },
         },
         {
           name: 'subItems',
@@ -45,9 +58,31 @@ export const Navigation: GlobalConfig = {
               required: true,
             },
             {
-              name: 'link',
+              name: 'type',
+              type: 'select',
+              options: [
+                { label: 'Internal Link', value: 'internal' },
+                { label: 'External Link', value: 'external' },
+              ],
+              defaultValue: 'internal',
+              required: true,
+            },
+            {
+              name: 'internalLink',
+              type: 'relationship',
+              relationTo: 'pages',
+              required: true,
+              admin: {
+                condition: (_, siblingData) => siblingData?.type === 'internal',
+              },
+            },
+            {
+              name: 'externalLink',
               type: 'text',
               required: true,
+              admin: {
+                condition: (_, siblingData) => siblingData?.type === 'external',
+              },
             },
           ],
         },
@@ -68,9 +103,28 @@ export const Navigation: GlobalConfig = {
           defaultValue: 'Get Consultation',
         },
         {
-          name: 'link',
+          name: 'type',
+          type: 'select',
+          options: [
+            { label: 'Internal Link', value: 'internal' },
+            { label: 'External Link', value: 'external' },
+          ],
+          defaultValue: 'internal',
+        },
+        {
+          name: 'internalLink',
+          type: 'relationship',
+          relationTo: 'pages',
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === 'internal',
+          },
+        },
+        {
+          name: 'externalLink',
           type: 'text',
-          defaultValue: '/contact',
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === 'external',
+          },
         },
       ],
     },
