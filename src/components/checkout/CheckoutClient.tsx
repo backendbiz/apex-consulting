@@ -253,21 +253,6 @@ export function CheckoutClient() {
               </div>
             </div>
           </div>
-
-          <div className="space-y-3">
-            <Link
-              href="/contact"
-              className="block w-full py-3 px-4 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 transition-colors text-center"
-            >
-              Contact Support
-            </Link>
-            <Link
-              href="/services"
-              className="block w-full py-3 px-4 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors text-center"
-            >
-              Browse Other Services
-            </Link>
-          </div>
         </Card>
       </div>
     )
@@ -332,8 +317,6 @@ export function CheckoutClient() {
                   </button>
                 </div>
               </div>
-
-
             </div>
 
             {/* Total */}
@@ -369,8 +352,6 @@ export function CheckoutClient() {
             )}
           </div>
         </div>
-
-
 
         {/* Back Link */}
         <div className="mt-6 text-center">
