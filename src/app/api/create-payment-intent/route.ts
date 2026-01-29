@@ -7,6 +7,83 @@ import {
   type ServiceStripeConfig,
 } from '@/lib/stripe'
 import { generateOrderId } from '@/lib/order-generator'
+import type { Payload } from 'payload'
+
+/**
+ * Helper function to create a pending order with retry logic
+ * Handles MongoDB WriteConflict errors (code 112) and duplicate key errors (code 11000)
+ */
+async function createPendingOrderWithRetry(
+  payload: Payload,
+  orderData: {
+    orderId: string
+    serviceId: string
+    price: number
+    paymentIntentId: string
+  },
+  maxRetries: number = 3,
+): Promise<void> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // First check if order already exists
+      const existingOrders = await payload.find({
+        collection: 'orders',
+        where: {
+          orderId: { equals: orderData.orderId },
+        },
+        limit: 1,
+      })
+
+      if (existingOrders.docs.length > 0) {
+        // Order already exists, nothing to do
+        console.log(`Order ${orderData.orderId} already exists, skipping creation`)
+        return
+      }
+
+      // Create the order
+      await payload.create({
+        collection: 'orders',
+        data: {
+          orderId: orderData.orderId,
+          service: orderData.serviceId,
+          status: 'pending',
+          total: orderData.price,
+          stripePaymentIntentId: orderData.paymentIntentId,
+        },
+      })
+
+      console.log(`Successfully created pending order: ${orderData.orderId}`)
+      return
+    } catch (error: unknown) {
+      const mongoError = error as { code?: number; codeName?: string }
+
+      // Handle WriteConflict (code 112) - retry with exponential backoff
+      if (mongoError.code === 112 || mongoError.codeName === 'WriteConflict') {
+        console.warn(
+          `WriteConflict on attempt ${attempt + 1}/${maxRetries} for order ${orderData.orderId}`,
+        )
+
+        if (attempt < maxRetries - 1) {
+          // Exponential backoff: 100ms, 200ms, 400ms...
+          const delay = Math.pow(2, attempt) * 100
+          await new Promise((resolve) => setTimeout(resolve, delay))
+          continue
+        }
+      }
+
+      // Handle duplicate key error (code 11000) - order was created by another request
+      if (mongoError.code === 11000) {
+        console.log(
+          `Order ${orderData.orderId} was created by another request (duplicate key), continuing`,
+        )
+        return
+      }
+
+      // If we've exhausted retries or it's a different error, throw
+      throw error
+    }
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -57,29 +134,16 @@ export async function POST(req: Request) {
       },
     })
 
-    // Create a pending order in the database
+    // Create a pending order in the database with retry logic
     try {
-      const existingOrders = await payload.find({
-        collection: 'orders',
-        where: {
-          orderId: { equals: orderId },
-        },
+      await createPendingOrderWithRetry(payload, {
+        orderId,
+        serviceId,
+        price: service.price,
+        paymentIntentId: paymentIntent.id,
       })
-
-      if (existingOrders.docs.length === 0) {
-        await payload.create({
-          collection: 'orders',
-          data: {
-            orderId,
-            service: serviceId,
-            status: 'pending',
-            total: service.price,
-            stripePaymentIntentId: paymentIntent.id,
-          },
-        })
-      }
     } catch (dbError) {
-      console.error('Error creating pending order:', dbError)
+      console.error('Error creating pending order after retries:', dbError)
       // Continue even if order creation fails - payment can still proceed
     }
 
