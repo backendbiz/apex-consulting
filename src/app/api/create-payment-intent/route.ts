@@ -194,7 +194,7 @@ export async function POST(req: Request) {
           const orderService = orderResult.service as Service
           if (orderService && typeof orderService !== 'string') {
             service = orderService
-             console.log(`Resuming existing order: ${existingOrder.id}`)
+            console.log(`Resuming existing order: ${existingOrder.id}`)
           }
         }
       } catch (e) {
@@ -213,34 +213,46 @@ export async function POST(req: Request) {
         stripeCredentials.secretKey !== process.env.STRIPE_SECRET_KEY
           ? getStripeForService(stripeCredentials.secretKey)
           : getStripe()
-      
+
       if (existingOrder.stripePaymentIntentId) {
-          try {
-             // Retrieve the existing payment intent
-            const paymentIntent = await stripe.paymentIntents.retrieve(existingOrder.stripePaymentIntentId)
-             
-            // Return the existing session details
-            return NextResponse.json({
-                clientSecret: paymentIntent.client_secret,
-                orderId: existingOrder.id,
-                checkoutUrl: `${process.env.NEXT_PUBLIC_SERVER_URL || 'https://dztech.shop'}/checkout?serviceId=${service.id}&orderId=${existingOrder.id}`,
-                amount: existingOrder.total,
-                quantity: existingOrder.quantity || 1,
-                serviceName: service.title,
-                serviceId: service.id,
-                stripePublishableKey: stripeCredentials.publishableKey,
-                provider: typeof existingOrder.provider === 'object' ? existingOrder.provider?.name : undefined,
-                providerId: typeof existingOrder.provider === 'object' ? existingOrder.provider?.id : existingOrder.provider,
-                successRedirectUrl: typeof existingOrder.provider === 'object' ? existingOrder.provider?.successRedirectUrl : undefined,
-                cancelRedirectUrl: typeof existingOrder.provider === 'object' ? existingOrder.provider?.cancelRedirectUrl : undefined,
-            })
-          } catch(stripeError) {
-             console.error("Failed to retrieve existing payment intent:", stripeError)
-             // Fallback to creating new one if retrieval fails? 
-             // Ideally we should error out or retry. For now, let's allow falling through to create new if strictly needed, 
-             // but better to error to avoid double charge.
-             return NextResponse.json({ error: 'Failed to retrieve payment session' }, { status: 500 })
-          }
+        try {
+          // Retrieve the existing payment intent
+          const paymentIntent = await stripe.paymentIntents.retrieve(
+            existingOrder.stripePaymentIntentId,
+          )
+
+          // Return the existing session details
+          return NextResponse.json({
+            clientSecret: paymentIntent.client_secret,
+            orderId: existingOrder.id,
+            checkoutUrl: `${process.env.NEXT_PUBLIC_SERVER_URL || 'https://app.dztech.shop'}/checkout?serviceId=${service.id}&orderId=${existingOrder.id}`,
+            amount: existingOrder.total,
+            quantity: existingOrder.quantity || 1,
+            serviceName: service.title,
+            serviceId: service.id,
+            stripePublishableKey: stripeCredentials.publishableKey,
+            provider:
+              typeof existingOrder.provider === 'object' ? existingOrder.provider?.name : undefined,
+            providerId:
+              typeof existingOrder.provider === 'object'
+                ? existingOrder.provider?.id
+                : existingOrder.provider,
+            successRedirectUrl:
+              typeof existingOrder.provider === 'object'
+                ? existingOrder.provider?.successRedirectUrl
+                : undefined,
+            cancelRedirectUrl:
+              typeof existingOrder.provider === 'object'
+                ? existingOrder.provider?.cancelRedirectUrl
+                : undefined,
+          })
+        } catch (stripeError) {
+          console.error('Failed to retrieve existing payment intent:', stripeError)
+          // Fallback to creating new one if retrieval fails?
+          // Ideally we should error out or retry. For now, let's allow falling through to create new if strictly needed,
+          // but better to error to avoid double charge.
+          return NextResponse.json({ error: 'Failed to retrieve payment session' }, { status: 500 })
+        }
       }
     }
 
@@ -261,7 +273,8 @@ export async function POST(req: Request) {
       cancelRedirectUrl = providerResult.provider.cancelRedirectUrl || undefined
 
       console.log(`Provider "${providerName}" authenticated, using service: ${service.title}`)
-    } else if (serviceId && !existingOrder) { // Only look up service if we didn't already find it via order
+    } else if (serviceId && !existingOrder) {
+      // Only look up service if we didn't already find it via order
       // Direct service ID request (existing behavior)
       const foundService = await payload.findByID({
         collection: 'services',
@@ -302,10 +315,7 @@ export async function POST(req: Request) {
 
       // 1. Validate amount is a multiple of 5
       if (requestedAmount % 5 !== 0) {
-        return NextResponse.json(
-          { error: 'Amount must be a multiple of 5' },
-          { status: 400 },
-        )
+        return NextResponse.json({ error: 'Amount must be a multiple of 5' }, { status: 400 })
       }
 
       // 2. Validate amount is at least the service price (optional, but good practice)
@@ -320,10 +330,10 @@ export async function POST(req: Request) {
       // Logic: Quantity = Requested Amount / Service Price
       // Example: Service=5, Amount=100 -> Quantity=20
       quantity = requestedAmount / service.price
-      
+
       // Ensure quantity is a whole number (optional check)
       if (!Number.isInteger(quantity)) {
-         return NextResponse.json(
+        return NextResponse.json(
           { error: `Amount ${requestedAmount} is not divisible by service price ${service.price}` },
           { status: 400 },
         )
@@ -382,7 +392,7 @@ export async function POST(req: Request) {
     }
 
     // Construct the checkout URL
-    const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'https://dztech.shop'
+    const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'https://app.dztech.shop'
     const checkoutUrl = `${baseUrl}/checkout?serviceId=${service.id}&orderId=${orderId}`
 
     const response = {
