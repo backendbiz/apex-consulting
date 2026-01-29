@@ -26,15 +26,17 @@ export function SuccessClient() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
   const orderId = searchParams.get('orderId')
+  const redirectStatus = searchParams.get('redirect_status')
 
   const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null)
   const [copied, setCopied] = useState(false)
   const [redirecting, setRedirecting] = useState(false)
   const [redirectCountdown, setRedirectCountdown] = useState(5)
+  const [status, setStatus] = useState<'success' | 'failed' | 'processing' | 'loading'>('loading')
 
-  // Trigger confetti on mount (only if not redirecting to provider)
+  // Trigger confetti on mount (only if success and not redirecting to provider)
   useEffect(() => {
-    if (redirecting) return
+    if (redirecting || status !== 'success') return
 
     // Trigger celebratory confetti
     const duration = 3 * 1000
@@ -66,22 +68,43 @@ export function SuccessClient() {
     }, 250)
 
     return () => clearInterval(interval)
-  }, [redirecting])
+  }, [redirecting, status])
 
   // Load order info from localStorage and check for provider redirect
   useEffect(() => {
+    // If we have a specific redirect status from Stripe, use it to determine logic
+    let currentStatus = 'success'
+    if (redirectStatus) {
+      if (redirectStatus === 'failed') {
+        currentStatus = 'failed'
+        setStatus('failed')
+      } else if (redirectStatus === 'processing') {
+        currentStatus = 'processing'
+        setStatus('processing')
+      } else if (redirectStatus === 'succeeded') {
+        currentStatus = 'success'
+        setStatus('success')
+      }
+    } else {
+      setStatus('success')
+    }
+
     if (orderId) {
       const orders = JSON.parse(localStorage.getItem('dztech_orders') || '[]')
       const order = orders.find((o: OrderInfo) => o.orderId === orderId)
       if (order) {
-        // Update order status to paid
-        order.status = 'paid'
-        order.paidAt = new Date().toISOString()
-        localStorage.setItem('dztech_orders', JSON.stringify(orders))
+        // Only update status to paid if it was a success
+        if (currentStatus === 'success') {
+          order.status = 'paid'
+          order.paidAt = new Date().toISOString()
+          localStorage.setItem('dztech_orders', JSON.stringify(orders))
+        }
+
         setOrderInfo(order)
 
         // Check if this is a provider payment with a redirect URL
-        if (order.successRedirectUrl) {
+        // Only redirect if payment succeeded
+        if (order.successRedirectUrl && currentStatus === 'success') {
           setRedirecting(true)
         }
       } else {
@@ -92,18 +115,22 @@ export function SuccessClient() {
       const orders = JSON.parse(localStorage.getItem('dztech_orders') || '[]')
       if (orders.length > 0) {
         const latestOrder = orders[orders.length - 1]
-        latestOrder.status = 'paid'
-        latestOrder.paidAt = new Date().toISOString()
-        localStorage.setItem('dztech_orders', JSON.stringify(orders))
+
+        if (currentStatus === 'success') {
+          latestOrder.status = 'paid'
+          latestOrder.paidAt = new Date().toISOString()
+          localStorage.setItem('dztech_orders', JSON.stringify(orders))
+        }
+
         setOrderInfo(latestOrder)
 
         // Check if this is a provider payment with a redirect URL
-        if (latestOrder.successRedirectUrl) {
+        if (latestOrder.successRedirectUrl && currentStatus === 'success') {
           setRedirecting(true)
         }
       }
     }
-  }, [orderId, sessionId])
+  }, [orderId, sessionId, redirectStatus])
 
   // Handle provider redirect with countdown
   useEffect(() => {
@@ -203,6 +230,34 @@ export function SuccessClient() {
     )
   }
 
+  const getHeaderContent = () => {
+    switch (status) {
+      case 'failed':
+        return {
+          colorClass: 'from-red-500 to-red-600',
+          icon: 'alert-circle' as const,
+          title: 'Payment Failed',
+          message: 'Something went wrong with your payment.',
+        }
+      case 'processing':
+        return {
+          colorClass: 'from-blue-500 to-blue-600',
+          icon: 'clock' as const,
+          title: 'Payment Processing',
+          message: 'Your payment is being processed. We will notify you once completed.',
+        }
+      default:
+        return {
+          colorClass: 'from-green-500 to-green-600',
+          icon: 'check-circle' as const,
+          title: 'Payment Successful!',
+          message: 'Thank you for your purchase',
+        }
+    }
+  }
+
+  const headerContent = getHeaderContent()
+
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100">
       {/* Header */}
@@ -223,15 +278,19 @@ export function SuccessClient() {
       <main className="py-12 md:py-20">
         <div className="container max-w-2xl">
           <Card className="text-center border border-gray-200 overflow-hidden" padding="none">
-            {/* Success Header */}
-            <div className="bg-linear-to-br from-green-500 to-green-600 px-8 py-10">
+            {/* Dynamic Header */}
+            <div className={`bg-linear-to-br ${headerContent.colorClass} px-8 py-10`}>
               <div className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-white/20 mb-6 animate-bounce-slow">
-                <Icon name="check-circle" className="h-14 w-14 text-white" strokeWidth={1.5} />
+                <Icon
+                  name={headerContent.icon}
+                  className="h-14 w-14 text-white"
+                  strokeWidth={1.5}
+                />
               </div>
               <h1 className="text-3xl md:text-4xl font-bold text-white mb-3">
-                Payment Successful!
+                {headerContent.title}
               </h1>
-              <p className="text-green-100 text-lg">Thank you for your purchase</p>
+              <p className="text-opacity-90 text-white text-lg">{headerContent.message}</p>
             </div>
 
             {/* Order Details */}
