@@ -133,7 +133,7 @@ export function ServicesGrid({
                       const port = window.location.port ? `:${window.location.port}` : ''
                       const domain = isLocal
                         ? `http://app.localhost${port}`
-                        : 'https://app.dzshop.shop'
+                        : 'https://app.dztech.shop'
                       const url = `${domain}/checkout?orderId=${orderId}&serviceId=${service.id}`
                       window.open(url, '_blank')
                     }}

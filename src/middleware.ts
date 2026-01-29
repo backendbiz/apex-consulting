@@ -10,13 +10,13 @@ export function middleware(request: NextRequest) {
   // Clean hostname to remove port for comparison logic if needed, but let's handle full host string
   const isLocal = hostname.includes('localhost')
 
-  const checkoutDomainHost = process.env.CHECKOUT_DOMAIN || 'app.dzshop.shop'
+  const checkoutDomainHost = process.env.CHECKOUT_DOMAIN || 'app.dztech.shop'
 
   const checkoutDomain = isLocal
     ? `app.localhost:${request.nextUrl.port || 3000}`
     : checkoutDomainHost
 
-  // 1. Bitloader Redirect: Accessing from bitloader should open app.dzshop.shop
+  // 1. Bitloader Redirect: Accessing from bitloader should open app.dztech.shop
   // We check if referer contains bitloader and we are not already on the checkout domain
   if (referer.includes('bitloader') && hostname !== checkoutDomain) {
     const checkoutUrl = new URL('/checkout', request.url)
@@ -26,7 +26,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(checkoutUrl)
   }
 
-  // 2. Checkout Domain Handling (app.dzshop.shop)
+  // 2. Checkout Domain Handling (app.dztech.shop)
   // If we are on the checkout domain
   if (hostname === checkoutDomain) {
     // Rewrite path /checkout to the implementation at /payment-standalone
