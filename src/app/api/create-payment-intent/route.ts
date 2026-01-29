@@ -118,21 +118,30 @@ export async function POST(req: Request) {
     // Use provided orderId or generate a new one
     const orderId = clientOrderId || generateOrderId()
 
+    // Create idempotency key to prevent duplicate payment intents
+    // Based on orderId + serviceId to ensure same order always gets same payment intent
+    const idempotencyKey = `pi_${orderId}_${serviceId}`
+
     // Create a PaymentIntent using the service's Stripe account
     // Note: Cash App is only available for US-based Stripe accounts
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(service.price * 100), // Amount in cents
-      currency: 'usd',
-      // Cash App only - requires US-based Stripe account
-      payment_method_types: ['cashapp'],
-      metadata: {
-        serviceId: service.id,
-        orderId: orderId,
-        serviceName: service.title,
-        // Store which Stripe account was used (for webhook routing)
-        useCustomStripeAccount: stripeConfig?.useCustomStripeAccount ? 'true' : 'false',
+    const paymentIntent = await stripe.paymentIntents.create(
+      {
+        amount: Math.round(service.price * 100), // Amount in cents
+        currency: 'usd',
+        // Cash App only - requires US-based Stripe account
+        payment_method_types: ['cashapp'],
+        metadata: {
+          serviceId: service.id,
+          orderId: orderId,
+          serviceName: service.title,
+          // Store which Stripe account was used (for webhook routing)
+          useCustomStripeAccount: stripeConfig?.useCustomStripeAccount ? 'true' : 'false',
+        },
       },
-    })
+      {
+        idempotencyKey, // Prevents duplicate payment intents for same orderId+serviceId
+      },
+    )
 
     // Create a pending order in the database with retry logic
     try {

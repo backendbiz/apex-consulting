@@ -47,6 +47,7 @@ export function CheckoutClient() {
   const [copied, setCopied] = useState(false)
 
   // Fetch service details and create payment intent
+  // Note: Duplicate calls are safely handled by Stripe's idempotency key on the backend
   useEffect(() => {
     async function initializeCheckout() {
       if (!serviceId) {
