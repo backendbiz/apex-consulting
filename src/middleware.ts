@@ -10,31 +10,34 @@ export function middleware(request: NextRequest) {
   // Clean hostname to remove port for comparison logic if needed, but let's handle full host string
   const isLocal = hostname.includes('localhost')
 
-  const checkoutDomainHost = process.env.CHECKOUT_DOMAIN || 'app.dztech.shop'
+  const checkoutDomainHost = process.env.CHECKOUT_DOMAIN || 'app.dzshop.shop'
 
   const checkoutDomain = isLocal
     ? `app.localhost:${request.nextUrl.port || 3000}`
     : checkoutDomainHost
 
-  // 1. Bitloader Redirect: Accessing from bitloader should open app.dztech.shop
+  // 1. Bitloader Redirect: Accessing from bitloader should open app.dzshop.shop
   // We check if referer contains bitloader and we are not already on the checkout domain
   if (referer.includes('bitloader') && hostname !== checkoutDomain) {
-    const checkoutUrl = new URL('/', request.url)
+    const checkoutUrl = new URL('/checkout', request.url)
     checkoutUrl.host = checkoutDomain
     checkoutUrl.protocol = request.nextUrl.protocol
     checkoutUrl.port = request.nextUrl.port // Maintain port in dev
     return NextResponse.redirect(checkoutUrl)
   }
 
-  // 2. Checkout Domain Handling (app.dztech.shop)
+  // 2. Checkout Domain Handling (app.dzshop.shop)
   // If we are on the checkout domain
   if (hostname === checkoutDomain) {
-    // If path is root, rewrite to the standalone payment page
-    if (url.pathname === '/') {
+    // Rewrite path /checkout to the implementation at /payment-standalone
+    if (url.pathname === '/checkout') {
       return NextResponse.rewrite(new URL('/payment-standalone', request.url))
     }
-    // If path is explicitly /payment-standalone, let it pass (it will be served)
-    // Other paths like /api/... or assets will fall through to next()
+    // If path is root, redirect to /checkout
+    if (url.pathname === '/') {
+      return NextResponse.redirect(new URL('/checkout', request.url))
+    }
+    // If request attempts to access /payment-standalone directly, let it pass (or you could redirect to /checkout for cleanliness)
   }
 
   // 3. New Main Domain (new.dztech.shop)

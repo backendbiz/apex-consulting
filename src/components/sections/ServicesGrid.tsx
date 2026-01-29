@@ -2,7 +2,6 @@
 import { Card, Button, Icon, type IconName } from '@/components/ui'
 import { cn } from '@/utils/cn'
 import { generateOrderId } from '@/lib/order-generator'
-import { useRouter } from 'next/navigation'
 
 interface Service {
   id: string
@@ -48,8 +47,6 @@ export function ServicesGrid({
     project: '/project',
     'one-time': '',
   }
-
-  const router = useRouter()
 
   return (
     <section className={cn('section bg-white', className)}>
@@ -130,7 +127,12 @@ export function ServicesGrid({
                     className="w-full"
                     onClick={() => {
                       const orderId = generateOrderId()
-                      router.push(`/checkout?orderId=${orderId}&serviceId=${service.id}`)
+                      const isLocal = window.location.hostname.includes('localhost')
+                      const domain = isLocal
+                        ? 'http://app.localhost:3000'
+                        : 'https://app.dzshop.shop'
+                      const url = `${domain}/checkout?orderId=${orderId}&serviceId=${service.id}`
+                      window.open(url, '_blank')
                     }}
                   >
                     Buy Now
