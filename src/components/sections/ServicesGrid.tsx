@@ -127,9 +127,12 @@ export function ServicesGrid({
                     className="w-full"
                     onClick={() => {
                       const orderId = generateOrderId()
-                      const isLocal = window.location.hostname.includes('localhost')
+                      const isLocal =
+                        window.location.hostname.includes('localhost') ||
+                        window.location.hostname.includes('127.0.0.1')
+                      const port = window.location.port ? `:${window.location.port}` : ''
                       const domain = isLocal
-                        ? 'http://app.localhost:3000'
+                        ? `http://app.localhost${port}`
                         : 'https://app.dzshop.shop'
                       const url = `${domain}/checkout?orderId=${orderId}&serviceId=${service.id}`
                       window.open(url, '_blank')
