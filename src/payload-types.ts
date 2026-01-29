@@ -76,6 +76,7 @@ export interface Config {
     orders: Order;
     projects: Project;
     'contact-requests': ContactRequest;
+    providers: Provider;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -92,6 +93,7 @@ export interface Config {
     orders: OrdersSelect<false> | OrdersSelect<true>;
     projects: ProjectsSelect<false> | ProjectsSelect<true>;
     'contact-requests': ContactRequestsSelect<false> | ContactRequestsSelect<true>;
+    providers: ProvidersSelect<false> | ProvidersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -647,15 +649,74 @@ export interface Job {
 export interface Order {
   id: string;
   /**
-   * Custom order ID (ORD-YYYYMMDD-HHMMSS-XXXXX)
+   * Provider's internal order/transaction ID for tracking
    */
-  orderId: string;
+  externalId?: string | null;
+  /**
+   * External provider that initiated this order (if applicable)
+   */
+  provider?: (string | null) | Provider;
   service: string | Service;
   status: 'pending' | 'paid' | 'failed' | 'refunded';
   total: number;
+  /**
+   * Number of units purchased (Total / Service Price)
+   */
+  quantity?: number | null;
   stripeSessionId?: string | null;
   stripePaymentIntentId?: string | null;
   customerEmail?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * External providers that use dztech.shop as their payment gateway
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "providers".
+ */
+export interface Provider {
+  id: string;
+  /**
+   * Name of the external provider (e.g., Bitloader)
+   */
+  name: string;
+  /**
+   * Unique identifier for the provider (e.g., bitloader)
+   */
+  slug: string;
+  /**
+   * The API key this provider will use to authenticate requests. Will be auto-generated if not provided.
+   */
+  apiKey: string;
+  /**
+   * The service whose Stripe configuration will be used for payments
+   */
+  service: string | Service;
+  /**
+   * Only active providers can process payments
+   */
+  status: 'active' | 'inactive';
+  /**
+   * URL to notify when a payment is completed (POST request with payment details)
+   */
+  webhookUrl?: string | null;
+  /**
+   * URL to redirect users after successful payment. Use {orderId} as placeholder. Example: https://bitloader.com/payment/success?orderId={orderId}
+   */
+  successRedirectUrl?: string | null;
+  /**
+   * URL to redirect users if they cancel payment. Use {orderId} as placeholder. Example: https://bitloader.com/payment/cancelled?orderId={orderId}
+   */
+  cancelRedirectUrl?: string | null;
+  /**
+   * Internal notes about this provider
+   */
+  description?: string | null;
+  /**
+   * Last time this provider made an API request
+   */
+  lastUsedAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -767,6 +828,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'contact-requests';
         value: string | ContactRequest;
+      } | null)
+    | ({
+        relationTo: 'providers';
+        value: string | Provider;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -1231,10 +1296,12 @@ export interface JobsSelect<T extends boolean = true> {
  * via the `definition` "orders_select".
  */
 export interface OrdersSelect<T extends boolean = true> {
-  orderId?: T;
+  externalId?: T;
+  provider?: T;
   service?: T;
   status?: T;
   total?: T;
+  quantity?: T;
   stripeSessionId?: T;
   stripePaymentIntentId?: T;
   customerEmail?: T;
@@ -1271,6 +1338,24 @@ export interface ContactRequestsSelect<T extends boolean = true> {
   image?: T;
   status?: T;
   remarks?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "providers_select".
+ */
+export interface ProvidersSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  apiKey?: T;
+  service?: T;
+  status?: T;
+  webhookUrl?: T;
+  successRedirectUrl?: T;
+  cancelRedirectUrl?: T;
+  description?: T;
+  lastUsedAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

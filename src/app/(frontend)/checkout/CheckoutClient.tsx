@@ -26,6 +26,9 @@ interface CheckoutState {
   clientSecret: string | null
   paymentOrderId: string | null
   stripePublishableKey: string | null
+  provider: string | null
+  successRedirectUrl: string | null
+  cancelRedirectUrl: string | null
 }
 
 export function CheckoutClient() {
@@ -42,6 +45,9 @@ export function CheckoutClient() {
     clientSecret: null,
     paymentOrderId: null,
     stripePublishableKey: null,
+    provider: null,
+    successRedirectUrl: null,
+    cancelRedirectUrl: null,
   })
 
   const [copied, setCopied] = useState(false)
@@ -98,6 +104,9 @@ export function CheckoutClient() {
           clientSecret: paymentData.clientSecret,
           paymentOrderId: paymentData.orderId,
           stripePublishableKey: paymentData.stripePublishableKey,
+          provider: paymentData.provider || null,
+          successRedirectUrl: paymentData.successRedirectUrl || null,
+          cancelRedirectUrl: paymentData.cancelRedirectUrl || null,
         }))
       } catch (error) {
         console.error('Checkout initialization error:', error)
@@ -114,7 +123,7 @@ export function CheckoutClient() {
     initializeCheckout()
   }, [serviceId, orderId])
 
-  // Store order ID in localStorage
+  // Store order ID and provider info in localStorage
   useEffect(() => {
     if (state.paymentOrderId && state.service) {
       const orders = JSON.parse(localStorage.getItem('dztech_orders') || '[]')
@@ -129,11 +138,22 @@ export function CheckoutClient() {
           price: state.service.price,
           createdAt: new Date().toISOString(),
           status: 'pending',
+          // Store provider info for redirect on success page
+          provider: state.provider,
+          successRedirectUrl: state.successRedirectUrl,
+          cancelRedirectUrl: state.cancelRedirectUrl,
         })
         localStorage.setItem('dztech_orders', JSON.stringify(orders))
       }
     }
-  }, [state.paymentOrderId, serviceId, state.service])
+  }, [
+    state.paymentOrderId,
+    serviceId,
+    state.service,
+    state.provider,
+    state.successRedirectUrl,
+    state.cancelRedirectUrl,
+  ])
 
   const copyOrderId = useCallback(() => {
     const orderIdToCopy = state.paymentOrderId || orderId
@@ -308,10 +328,7 @@ export function CheckoutClient() {
                 </div>
               </div>
 
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-sm">Service</span>
-                <span className="font-semibold text-gray-900 text-sm">{service.title}</span>
-              </div>
+
             </div>
 
             {/* Total */}
@@ -346,15 +363,9 @@ export function CheckoutClient() {
               </div>
             )}
           </div>
-
-          {/* Footer */}
-          <div className="px-6 pb-6 text-center">
-            <p className="text-xs text-gray-400">
-              Secured by <span className="font-medium">Stripe</span> | Powered by{' '}
-              <span className="font-medium text-blue-500">DZTech</span>
-            </p>
-          </div>
         </div>
+
+
 
         {/* Back Link */}
         <div className="mt-6 text-center">

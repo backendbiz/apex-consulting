@@ -3,8 +3,8 @@ import type { CollectionConfig } from 'payload'
 export const Orders: CollectionConfig = {
   slug: 'orders',
   admin: {
-    useAsTitle: 'orderId',
-    defaultColumns: ['orderId', 'createdAt', 'status', 'total', 'service'],
+    useAsTitle: 'id',
+    defaultColumns: ['id', 'createdAt', 'status', 'total', 'service', 'provider'],
   },
   access: {
     read: () => true,
@@ -13,12 +13,20 @@ export const Orders: CollectionConfig = {
   },
   fields: [
     {
-      name: 'orderId',
+      name: 'externalId',
       type: 'text',
-      required: true,
-      unique: true,
+      label: 'External ID',
+      index: true,
       admin: {
-        description: 'Custom order ID (ORD-YYYYMMDD-HHMMSS-XXXXX)',
+        description: "Provider's internal order/transaction ID for tracking",
+      },
+    },
+    {
+      name: 'provider',
+      type: 'relationship',
+      relationTo: 'providers',
+      admin: {
+        description: 'External provider that initiated this order (if applicable)',
       },
     },
     {
@@ -45,6 +53,14 @@ export const Orders: CollectionConfig = {
       required: true,
     },
     {
+      name: 'quantity',
+      type: 'number',
+      defaultValue: 1,
+      admin: {
+        description: 'Number of units purchased (Total / Service Price)',
+      },
+    },
+    {
       name: 'stripeSessionId',
       type: 'text',
       admin: {
@@ -54,6 +70,7 @@ export const Orders: CollectionConfig = {
     {
       name: 'stripePaymentIntentId',
       type: 'text',
+      index: true,
       admin: {
         readOnly: true,
       },
@@ -62,11 +79,5 @@ export const Orders: CollectionConfig = {
       name: 'customerEmail',
       type: 'email',
     },
-    // If you have authentication, you can link to a user
-    // {
-    //   name: 'user',
-    //   type: 'relationship',
-    //   relationTo: 'users',
-    // },
   ],
 }

@@ -6,61 +6,70 @@ import {
   getStripeCredentialsForService,
   type ServiceStripeConfig,
 } from '@/lib/stripe'
-import { generateOrderId } from '@/lib/order-generator'
+import { isValidApiKeyFormat } from '@/lib/api-key'
 import type { Payload } from 'payload'
+import type { Service, Order, Provider } from '@/payload-types'
 
 /**
  * Helper function to create a pending order with retry logic
- * Handles MongoDB WriteConflict errors (code 112) and duplicate key errors (code 11000)
+ * Handles MongoDB WriteConflict errors (code 112)
  */
 async function createPendingOrderWithRetry(
   payload: Payload,
   orderData: {
-    orderId: string
     serviceId: string
     price: number
+    quantity?: number
     paymentIntentId: string
+    providerId?: string
+    externalId?: string
   },
   maxRetries: number = 3,
-): Promise<void> {
+): Promise<Order> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // First check if order already exists
+      // Check if order already exists for this payment intent
       const existingOrders = await payload.find({
         collection: 'orders',
         where: {
-          orderId: { equals: orderData.orderId },
+          stripePaymentIntentId: { equals: orderData.paymentIntentId },
         },
         limit: 1,
       })
 
       if (existingOrders.docs.length > 0) {
-        // Order already exists, nothing to do
-        console.log(`Order ${orderData.orderId} already exists, skipping creation`)
-        return
+        // Order already exists, return it
+        console.log(
+          `Order for payment intent ${orderData.paymentIntentId} already exists, returning existing`,
+        )
+        return existingOrders.docs[0]
       }
 
       // Create the order
-      await payload.create({
+      const order = await payload.create({
         collection: 'orders',
         data: {
-          orderId: orderData.orderId,
           service: orderData.serviceId,
           status: 'pending',
           total: orderData.price,
+          quantity: orderData.quantity || 1,
           stripePaymentIntentId: orderData.paymentIntentId,
+          // Store provider reference if applicable
+          ...(orderData.providerId && { provider: orderData.providerId }),
+          // Store external ID for provider tracking
+          ...(orderData.externalId && { externalId: orderData.externalId }),
         },
       })
 
-      console.log(`Successfully created pending order: ${orderData.orderId}`)
-      return
+      console.log(`Successfully created pending order: ${order.id}`)
+      return order
     } catch (error: unknown) {
       const mongoError = error as { code?: number; codeName?: string }
 
       // Handle WriteConflict (code 112) - retry with exponential backoff
       if (mongoError.code === 112 || mongoError.codeName === 'WriteConflict') {
         console.warn(
-          `WriteConflict on attempt ${attempt + 1}/${maxRetries} for order ${orderData.orderId}`,
+          `WriteConflict on attempt ${attempt + 1}/${maxRetries} for payment intent ${orderData.paymentIntentId}`,
         )
 
         if (attempt < maxRetries - 1) {
@@ -74,35 +83,198 @@ async function createPendingOrderWithRetry(
       // Handle duplicate key error (code 11000) - order was created by another request
       if (mongoError.code === 11000) {
         console.log(
-          `Order ${orderData.orderId} was created by another request (duplicate key), continuing`,
+          `Order for payment intent ${orderData.paymentIntentId} was created by another request, fetching it`,
         )
-        return
+        // Fetch and return the existing order
+        const existingOrders = await payload.find({
+          collection: 'orders',
+          where: {
+            stripePaymentIntentId: { equals: orderData.paymentIntentId },
+          },
+          limit: 1,
+        })
+        if (existingOrders.docs.length > 0) {
+          return existingOrders.docs[0]
+        }
       }
 
       // If we've exhausted retries or it's a different error, throw
       throw error
     }
   }
+
+  throw new Error('Failed to create order after max retries')
+}
+
+/**
+ * Validate provider API key and return provider with linked service
+ */
+async function validateProviderApiKey(
+  payload: Payload,
+  apiKey: string,
+): Promise<{ provider: Provider; service: Service } | null> {
+  // Quick format check before database query
+  if (!isValidApiKeyFormat(apiKey)) {
+    console.warn('Invalid API key format provided')
+    return null
+  }
+
+  try {
+    const result = await payload.find({
+      collection: 'providers',
+      where: {
+        apiKey: { equals: apiKey },
+        status: { equals: 'active' },
+      },
+      limit: 1,
+      depth: 1, // Populate the service relationship
+    })
+
+    if (result.docs.length === 0) {
+      console.warn('No active provider found for API key')
+      return null
+    }
+
+    const provider = result.docs[0]
+
+    // Get the linked service
+    const service = provider.service as Service
+    if (!service || typeof service === 'string') {
+      console.error('Provider service not populated or missing')
+      return null
+    }
+
+    // Update last used timestamp (fire and forget)
+    payload
+      .update({
+        collection: 'providers',
+        id: provider.id,
+        data: {
+          lastUsedAt: new Date().toISOString(),
+        },
+      })
+      .catch((err) => console.error('Failed to update lastUsedAt:', err))
+
+    return {
+      provider,
+      service,
+    }
+  } catch (error) {
+    console.error('Error validating provider API key:', error)
+    return null
+  }
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { serviceId, orderId: clientOrderId } = body
+    const { serviceId, apiKey, externalId } = body
     const payload = await getPayloadClient()
 
-    if (!serviceId) {
-      return NextResponse.json({ error: 'Service ID is required' }, { status: 400 })
+    let service: Service | undefined
+    let providerId: string | undefined
+    let providerName: string | undefined
+    let successRedirectUrl: string | undefined
+    let cancelRedirectUrl: string | undefined
+
+    // Check if we are resuming an existing order
+    let existingOrder: Order | null = null
+    const incomingOrderId = body.orderId || body.clientOrderId
+
+    if (incomingOrderId) {
+      try {
+        const orderResult = await payload.findByID({
+          collection: 'orders',
+          id: incomingOrderId,
+          depth: 1, // Populate service
+        })
+        if (orderResult) {
+          existingOrder = orderResult
+          // Use the existing order's service
+          const orderService = orderResult.service as Service
+          if (orderService && typeof orderService !== 'string') {
+            service = orderService
+             console.log(`Resuming existing order: ${existingOrder.id}`)
+          }
+        }
+      } catch (e) {
+        console.warn('Could not find existing order:', incomingOrderId)
+        // If not found, ignore and continue to create new (or fail if strictly required)
+      }
     }
 
-    // Fetch the service details including Stripe configuration
-    const service = await payload.findByID({
-      collection: 'services',
-      id: serviceId,
-    })
+    // If we verify the existing order, recover the session
+    if (existingOrder && service) {
+      // Get Stripe creds for this service
+      const stripeConfig = service.stripeConfig as ServiceStripeConfig | undefined
+      const stripeCredentials = getStripeCredentialsForService(stripeConfig)
 
-    if (!service) {
-      return NextResponse.json({ error: 'Service not found' }, { status: 404 })
+      const stripe =
+        stripeCredentials.secretKey !== process.env.STRIPE_SECRET_KEY
+          ? getStripeForService(stripeCredentials.secretKey)
+          : getStripe()
+      
+      if (existingOrder.stripePaymentIntentId) {
+          try {
+             // Retrieve the existing payment intent
+            const paymentIntent = await stripe.paymentIntents.retrieve(existingOrder.stripePaymentIntentId)
+             
+            // Return the existing session details
+            return NextResponse.json({
+                clientSecret: paymentIntent.client_secret,
+                orderId: existingOrder.id,
+                checkoutUrl: `${process.env.NEXT_PUBLIC_SERVER_URL || 'https://dztech.shop'}/checkout?serviceId=${service.id}&orderId=${existingOrder.id}`,
+                amount: existingOrder.total,
+                quantity: existingOrder.quantity || 1,
+                serviceName: service.title,
+                serviceId: service.id,
+                stripePublishableKey: stripeCredentials.publishableKey,
+                provider: typeof existingOrder.provider === 'object' ? existingOrder.provider?.name : undefined,
+                providerId: typeof existingOrder.provider === 'object' ? existingOrder.provider?.id : existingOrder.provider,
+                successRedirectUrl: typeof existingOrder.provider === 'object' ? existingOrder.provider?.successRedirectUrl : undefined,
+                cancelRedirectUrl: typeof existingOrder.provider === 'object' ? existingOrder.provider?.cancelRedirectUrl : undefined,
+            })
+          } catch(stripeError) {
+             console.error("Failed to retrieve existing payment intent:", stripeError)
+             // Fallback to creating new one if retrieval fails? 
+             // Ideally we should error out or retry. For now, let's allow falling through to create new if strictly needed, 
+             // but better to error to avoid double charge.
+             return NextResponse.json({ error: 'Failed to retrieve payment session' }, { status: 500 })
+          }
+      }
+    }
+
+    // === Standard Flow (New Order) ===
+
+    // Check if this is an external provider request (using API key)
+    if (apiKey) {
+      const providerResult = await validateProviderApiKey(payload, apiKey)
+
+      if (!providerResult) {
+        return NextResponse.json({ error: 'Invalid or inactive API key' }, { status: 401 })
+      }
+
+      service = providerResult.service
+      providerId = providerResult.provider.id
+      providerName = providerResult.provider.name
+      successRedirectUrl = providerResult.provider.successRedirectUrl || undefined
+      cancelRedirectUrl = providerResult.provider.cancelRedirectUrl || undefined
+
+      console.log(`Provider "${providerName}" authenticated, using service: ${service.title}`)
+    } else if (serviceId && !existingOrder) { // Only look up service if we didn't already find it via order
+      // Direct service ID request (existing behavior)
+      const foundService = await payload.findByID({
+        collection: 'services',
+        id: serviceId,
+      })
+
+      if (!foundService) {
+        return NextResponse.json({ error: 'Service not found' }, { status: 404 })
+      }
+
+      service = foundService
+    } else {
+      return NextResponse.json({ error: 'Either serviceId or apiKey is required' }, { status: 400 })
     }
 
     // Get Stripe credentials for this service (custom or default)
@@ -115,80 +287,157 @@ export async function POST(req: Request) {
         ? getStripeForService(stripeCredentials.secretKey)
         : getStripe()
 
-    // Use provided orderId or generate a new one
-    const orderId = clientOrderId || generateOrderId()
+    // Determine final amount and quantity
+    // Default to service price if no specific amount is requested
+    let finalAmount = service.price
+    let quantity = 1
 
-    // Create idempotency key to prevent duplicate payment intents
-    // Based on orderId + serviceId to ensure same order always gets same payment intent
-    const idempotencyKey = `pi_${orderId}_${serviceId}`
+    // If a custom amount is provided by the provider
+    if (body.amount) {
+      const requestedAmount = Number(body.amount)
+
+      if (isNaN(requestedAmount) || requestedAmount <= 0) {
+        return NextResponse.json({ error: 'Invalid amount provided' }, { status: 400 })
+      }
+
+      // 1. Validate amount is a multiple of 5
+      if (requestedAmount % 5 !== 0) {
+        return NextResponse.json(
+          { error: 'Amount must be a multiple of 5' },
+          { status: 400 },
+        )
+      }
+
+      // 2. Validate amount is at least the service price (optional, but good practice)
+      if (requestedAmount < service.price) {
+        return NextResponse.json(
+          { error: `Amount cannot be less than service price (${service.price})` },
+          { status: 400 },
+        )
+      }
+
+      // 3. Calculate quantity
+      // Logic: Quantity = Requested Amount / Service Price
+      // Example: Service=5, Amount=100 -> Quantity=20
+      quantity = requestedAmount / service.price
+      
+      // Ensure quantity is a whole number (optional check)
+      if (!Number.isInteger(quantity)) {
+         return NextResponse.json(
+          { error: `Amount ${requestedAmount} is not divisible by service price ${service.price}` },
+          { status: 400 },
+        )
+      }
+
+      finalAmount = requestedAmount
+    }
+
+    // Create idempotency key based on externalId or timestamp to prevent duplicates
+    const idempotencyKey = externalId
+      ? `pi_${service.id}_${externalId}_${finalAmount}`
+      : `pi_${service.id}_${Date.now()}_${Math.random().toString(36).substring(7)}`
 
     // Create a PaymentIntent using the service's Stripe account
     // Note: Cash App is only available for US-based Stripe accounts
     const paymentIntent = await stripe.paymentIntents.create(
       {
-        amount: Math.round(service.price * 100), // Amount in cents
+        amount: Math.round(finalAmount * 100), // Amount in cents
         currency: 'usd',
         // Cash App only - requires US-based Stripe account
         payment_method_types: ['cashapp'],
         metadata: {
           serviceId: service.id,
-          orderId: orderId,
           serviceName: service.title,
+          quantity: quantity.toString(), // <--- Store quantity in metadata
           // Store which Stripe account was used (for webhook routing)
           useCustomStripeAccount: stripeConfig?.useCustomStripeAccount ? 'true' : 'false',
+          // Store provider info if applicable
+          ...(providerId && { providerId }),
+          ...(providerName && { providerName }),
+          // Store external ID for provider tracking
+          ...(externalId && { externalId }),
         },
       },
       {
-        idempotencyKey, // Prevents duplicate payment intents for same orderId+serviceId
+        idempotencyKey, // Prevents duplicate payment intents
       },
     )
 
     // Create a pending order in the database with retry logic
+    let orderId: string
     try {
-      await createPendingOrderWithRetry(payload, {
-        orderId,
-        serviceId,
-        price: service.price,
+      const order = await createPendingOrderWithRetry(payload, {
+        serviceId: service.id,
+        price: finalAmount,
+        quantity: quantity, // <--- Save quantity to order
         paymentIntentId: paymentIntent.id,
+        providerId,
+        externalId,
       })
+      orderId = order.id
     } catch (dbError) {
       console.error('Error creating pending order after retries:', dbError)
-      // Continue even if order creation fails - payment can still proceed
+      // Generate a temporary ID if order creation fails
+      orderId = `temp_${paymentIntent.id}`
     }
 
-    // Return the client secret AND the publishable key for this service
-    return NextResponse.json({
+    // Construct the checkout URL
+    const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'https://dztech.shop'
+    const checkoutUrl = `${baseUrl}/checkout?serviceId=${service.id}&orderId=${orderId}`
+
+    const response = {
       clientSecret: paymentIntent.client_secret,
       orderId,
-      amount: service.price,
+      checkoutUrl,
+      amount: finalAmount,
+      quantity,
       serviceName: service.title,
-      // Include the publishable key so frontend can use the correct Stripe account
+      serviceId: service.id,
       stripePublishableKey: stripeCredentials.publishableKey,
-    })
+      ...(providerName && { provider: providerName }),
+      ...(providerId && { providerId }),
+      ...(externalId && { externalId }),
+      ...(successRedirectUrl && { successRedirectUrl }),
+      ...(cancelRedirectUrl && { cancelRedirectUrl }),
+    }
+
+    // If request came from a provider (via apiKey), return specific/minimal details
+    if (apiKey) {
+      return NextResponse.json({
+        checkoutUrl,
+        orderId,
+        externalId: externalId || null,
+        amount: finalAmount,
+      })
+    }
+
+    // Otherwise return full details for the frontend
+    return NextResponse.json(response)
   } catch (error: unknown) {
     console.error('Error creating payment intent:', error)
 
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
     // Check if this is a Cash App not available error
-    const isCashAppUnavailable =
-      errorMessage.includes('cashapp') &&
-      (errorMessage.includes('not supported') ||
-        errorMessage.includes('not available') ||
-        errorMessage.includes('invalid_request_error'))
-
-    if (isCashAppUnavailable) {
+    // This happens when the Stripe account is not US-based
+    if (
+      errorMessage.includes('cashapp') ||
+      errorMessage.includes('payment_method_types') ||
+      errorMessage.includes('not available')
+    ) {
       return NextResponse.json(
         {
-          error: 'Cash App payments are not available for this service. Please contact support.',
-          errorCode: 'CASHAPP_UNAVAILABLE',
+          error: 'Cash App payments are not available for this service',
           details:
-            'The Stripe account for this service is not based in the United States, which is required for Cash App payments.',
+            'This payment method requires a US-based Stripe account. Please contact support.',
         },
         { status: 400 },
       )
     }
 
-    return NextResponse.json({ error: errorMessage }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to create payment intent', details: errorMessage },
+      { status: 500 },
+    )
   }
 }

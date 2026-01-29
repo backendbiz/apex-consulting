@@ -11,6 +11,15 @@ interface OrderInfo {
   serviceName?: string
   price?: number
   createdAt?: string
+  provider?: string | null
+  successRedirectUrl?: string | null
+}
+
+/**
+ * Replace {orderId} placeholder in URL with actual orderId
+ */
+function buildRedirectUrl(templateUrl: string, orderId: string): string {
+  return templateUrl.replace(/{orderId}/g, orderId)
 }
 
 export function SuccessClient() {
@@ -20,9 +29,13 @@ export function SuccessClient() {
 
   const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null)
   const [copied, setCopied] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
+  const [redirectCountdown, setRedirectCountdown] = useState(5)
 
-  // Trigger confetti on mount
+  // Trigger confetti on mount (only if not redirecting to provider)
   useEffect(() => {
+    if (redirecting) return
+
     // Trigger celebratory confetti
     const duration = 3 * 1000
     const animationEnd = Date.now() + duration
@@ -53,9 +66,9 @@ export function SuccessClient() {
     }, 250)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [redirecting])
 
-  // Load order info from localStorage
+  // Load order info from localStorage and check for provider redirect
   useEffect(() => {
     if (orderId) {
       const orders = JSON.parse(localStorage.getItem('dztech_orders') || '[]')
@@ -66,6 +79,11 @@ export function SuccessClient() {
         order.paidAt = new Date().toISOString()
         localStorage.setItem('dztech_orders', JSON.stringify(orders))
         setOrderInfo(order)
+
+        // Check if this is a provider payment with a redirect URL
+        if (order.successRedirectUrl) {
+          setRedirecting(true)
+        }
       } else {
         setOrderInfo({ orderId })
       }
@@ -78,9 +96,42 @@ export function SuccessClient() {
         latestOrder.paidAt = new Date().toISOString()
         localStorage.setItem('dztech_orders', JSON.stringify(orders))
         setOrderInfo(latestOrder)
+
+        // Check if this is a provider payment with a redirect URL
+        if (latestOrder.successRedirectUrl) {
+          setRedirecting(true)
+        }
       }
     }
   }, [orderId, sessionId])
+
+  // Handle provider redirect with countdown
+  useEffect(() => {
+    if (!redirecting || !orderInfo?.successRedirectUrl) return
+
+    // Start countdown
+    const countdownInterval = setInterval(() => {
+      setRedirectCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval)
+          // Perform the redirect
+          const redirectUrl = buildRedirectUrl(orderInfo.successRedirectUrl!, orderInfo.orderId)
+          window.location.href = redirectUrl
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(countdownInterval)
+  }, [redirecting, orderInfo])
+
+  const handleRedirectNow = useCallback(() => {
+    if (orderInfo?.successRedirectUrl) {
+      const redirectUrl = buildRedirectUrl(orderInfo.successRedirectUrl, orderInfo.orderId)
+      window.location.href = redirectUrl
+    }
+  }, [orderInfo])
 
   const copyOrderId = useCallback(() => {
     if (orderInfo?.orderId) {
@@ -91,6 +142,66 @@ export function SuccessClient() {
   }, [orderInfo])
 
   const displayOrderId = orderInfo?.orderId || orderId || sessionId || 'N/A'
+
+  // Provider redirect UI
+  if (redirecting && orderInfo?.provider) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-green-50 to-green-100 flex items-center justify-center p-4">
+        <Card
+          className="w-full max-w-md text-center border border-green-200 shadow-lg"
+          padding="lg"
+        >
+          {/* Success Icon */}
+          <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-green-100 mb-6">
+            <Icon name="check-circle" className="h-12 w-12 text-green-600" strokeWidth={1.5} />
+          </div>
+
+          <h1 className="text-2xl font-bold text-gray-900 mb-3">Payment Successful!</h1>
+
+          {/* Order ID */}
+          <div className="mb-6 p-3 bg-gray-50 rounded-lg">
+            <p className="text-sm text-gray-500 mb-1">Order Reference</p>
+            <div className="flex items-center justify-center gap-2">
+              <span className="font-mono font-bold text-gray-900 text-sm truncate max-w-48">
+                {orderInfo.orderId}
+              </span>
+              <button
+                onClick={copyOrderId}
+                className="p-1 hover:bg-gray-200 rounded transition-colors"
+                title="Copy Order ID"
+              >
+                <Icon name={copied ? 'check' : 'copy'} className="h-4 w-4 text-gray-500" />
+              </button>
+            </div>
+          </div>
+
+          {/* Redirect message */}
+          <div className="mb-6">
+            <p className="text-gray-600 mb-2">
+              Redirecting you back to <span className="font-semibold">{orderInfo.provider}</span>...
+            </p>
+            <div className="flex items-center justify-center gap-2 text-gray-500">
+              <div className="h-5 w-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+              <span>Redirecting in {redirectCountdown} seconds</span>
+            </div>
+          </div>
+
+          {/* Manual redirect button */}
+          <button
+            onClick={handleRedirectNow}
+            className="w-full py-3 px-4 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 transition-colors"
+          >
+            Continue to {orderInfo.provider} Now
+          </button>
+
+          {/* Footer */}
+          <p className="mt-4 text-xs text-gray-400">
+            Powered by <span className="font-medium text-blue-500">DZTech</span>
+          </p>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100">
@@ -129,7 +240,7 @@ export function SuccessClient() {
               <div className="mb-8 p-4 bg-gray-50 rounded-xl">
                 <p className="text-sm text-gray-500 mb-2">Your Order Reference</p>
                 <div className="flex items-center justify-center gap-3">
-                  <span className="font-mono font-bold text-xl text-navy-900">
+                  <span className="font-mono font-bold text-lg text-navy-900 truncate max-w-xs">
                     {displayOrderId}
                   </span>
                   <button
