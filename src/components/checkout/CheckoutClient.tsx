@@ -7,6 +7,7 @@ import type { IconName } from '@/components/ui'
 import Link from 'next/link'
 import { StripeProvider } from '@/components/checkout/StripeProvider'
 import { CashAppPaymentForm } from '@/components/checkout/CashAppPaymentForm'
+import { StripeBuyButton } from '@/components/Service/StripeBuyButton'
 
 interface ServiceData {
   id: string
@@ -16,6 +17,7 @@ interface ServiceData {
   priceUnit?: string
   icon?: IconName
   slug: string
+  stripeBuyButtonId?: string | null
 }
 
 interface CheckoutState {
@@ -52,6 +54,10 @@ export function CheckoutClient() {
   const redirectStatus = searchParams.get('redirect_status') as PaymentResultStatus
   const paymentIntentParam = searchParams.get('payment_intent')
   const paymentIntentClientSecret = searchParams.get('payment_intent_client_secret')
+  
+  // Stripe Buy Button / Payment Link success redirect params
+  const successParam = searchParams.get('success')
+  const sessionIdParam = searchParams.get('session_id')
 
   const [state, setState] = useState<CheckoutState>({
     loading: true,
@@ -76,6 +82,13 @@ export function CheckoutClient() {
   // Note: Duplicate calls are safely handled by Stripe's idempotency key on the backend
   useEffect(() => {
     async function initializeCheckout() {
+      // Skip normal initialization if this is a success redirect from Stripe Buy Button
+      // The success handler will take care of fetching session details
+      if (successParam === 'true' && sessionIdParam) {
+        console.log('Success redirect detected, skipping normal initialization')
+        return
+      }
+
       if (!serviceId && !paymentLinkId) {
         setState((prev) => ({
           ...prev,
@@ -87,12 +100,21 @@ export function CheckoutClient() {
 
       try {
         let currentService: ServiceData
-        let paymentData
+        let paymentData: {
+          clientSecret?: string
+          orderId?: string
+          serviceId?: string
+          amount?: number
+          stripePublishableKey?: string
+          provider?: string
+          successRedirectUrl?: string
+          cancelRedirectUrl?: string
+        } | undefined
 
         if (paymentLinkId) {
           // === Path A: Payment Link Flow ===
           // 1. Create intent first (resolves service from link)
-          const paymentResponse = await fetch('/api/create-payment-intent', {
+          const paymentResponse = await fetch('/api/v1/create-payment-intent', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -117,22 +139,63 @@ export function CheckoutClient() {
           paymentData = await paymentResponse.json()
 
           // 2. Fetch service details using the resolved ID
-          const serviceResponse = await fetch(`/api/services/${paymentData.serviceId}`)
+          const resolvedServiceId = paymentData?.serviceId
+          if (!resolvedServiceId) {
+            throw new Error('Service ID not returned from payment intent')
+          }
+          const serviceResponse = await fetch(`/api/v1/services/${resolvedServiceId}`)
           if (!serviceResponse.ok) {
             throw new Error('Associated service not found')
           }
           currentService = await serviceResponse.json()
+
+          // 3. Check if service uses Stripe Buy Button
+          // If so, use Buy Button instead of Cash App (even though we created PaymentIntent)
+          if (currentService.stripeBuyButtonId) {
+            console.log('Service has Stripe Buy Button, using Buy Button flow')
+            setState((prev) => ({
+              ...prev,
+              loading: false,
+              service: currentService,
+              clientSecret: null, // Don't use the PaymentIntent
+              paymentOrderId: paymentData?.orderId || null,
+              stripePublishableKey: paymentData?.stripePublishableKey || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || null,
+              provider: paymentData?.provider || null,
+              successRedirectUrl: paymentData?.successRedirectUrl || null,
+              cancelRedirectUrl: paymentData?.cancelRedirectUrl || null,
+            }))
+            return // Exit early, use Buy Button
+          }
         } else {
           // === Path B: Standard Service ID Flow ===
           // 1. First, fetch service details
-          const serviceResponse = await fetch(`/api/services/${serviceId}`)
+          const serviceResponse = await fetch(`/api/v1/services/${serviceId}`)
           if (!serviceResponse.ok) {
             throw new Error('Service not found')
           }
           currentService = await serviceResponse.json()
 
-          // 2. Then, create a payment intent
-          const paymentResponse = await fetch('/api/create-payment-intent', {
+          // 2. Check if service uses Stripe Buy Button (skip PaymentIntent creation)
+          if (currentService.stripeBuyButtonId) {
+            console.log('Service has Stripe Buy Button, skipping PaymentIntent creation')
+            // For Buy Button flow, we don't need a PaymentIntent
+            // Just set up the state with service data
+            setState((prev) => ({
+              ...prev,
+              loading: false,
+              service: currentService,
+              clientSecret: null, // No client secret needed for Buy Button
+              paymentOrderId: orderId || null,
+              stripePublishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || null,
+              provider: null,
+              successRedirectUrl: null,
+              cancelRedirectUrl: null,
+            }))
+            return // Exit early, don't create PaymentIntent
+          }
+
+          // 3. Create a payment intent (only for Cash App flow)
+          const paymentResponse = await fetch('/api/v1/create-payment-intent', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -156,7 +219,7 @@ export function CheckoutClient() {
         }
 
         // Common: Update service price with actual amount from intent (handles overrides/links)
-        if (paymentData.amount) {
+        if (paymentData?.amount) {
           currentService.price = paymentData.amount
         }
 
@@ -164,12 +227,12 @@ export function CheckoutClient() {
           ...prev,
           loading: false,
           service: currentService,
-          clientSecret: paymentData.clientSecret,
-          paymentOrderId: paymentData.orderId,
-          stripePublishableKey: paymentData.stripePublishableKey,
-          provider: paymentData.provider || null,
-          successRedirectUrl: paymentData.successRedirectUrl || null,
-          cancelRedirectUrl: paymentData.cancelRedirectUrl || null,
+          clientSecret: paymentData?.clientSecret || null,
+          paymentOrderId: paymentData?.orderId || orderId || null,
+          stripePublishableKey: paymentData?.stripePublishableKey || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || null,
+          provider: paymentData?.provider || null,
+          successRedirectUrl: paymentData?.successRedirectUrl || null,
+          cancelRedirectUrl: paymentData?.cancelRedirectUrl || null,
         }))
       } catch (error) {
         console.error('Checkout initialization error:', error)
@@ -184,7 +247,7 @@ export function CheckoutClient() {
     }
 
     initializeCheckout()
-  }, [serviceId, orderId, paymentLinkId])
+  }, [serviceId, orderId, paymentLinkId, successParam, sessionIdParam])
 
   // Store order ID and provider info in localStorage
   useEffect(() => {
@@ -280,6 +343,64 @@ export function CheckoutClient() {
 
     verifyPaymentStatus()
   }, [paymentIntentParam, paymentIntentClientSecret, redirectStatus, state.stripePublishableKey])
+
+  // Handle Stripe Buy Button / Payment Link success redirect
+  useEffect(() => {
+    async function handleSuccessRedirect() {
+      // Check if this is a success redirect from Stripe Buy Button
+      if (successParam !== 'true') return
+
+      console.log('Stripe Buy Button payment success detected')
+
+      // If we have session_id, fetch session details to get order info
+      if (sessionIdParam && !serviceId && !orderId) {
+        try {
+          console.log('Fetching session details for:', sessionIdParam)
+          const response = await fetch(`/api/v1/verify-session?session_id=${sessionIdParam}`)
+          const data = await response.json()
+
+          if (data.success && data.order && data.service) {
+            console.log('Session verified:', data)
+            
+            // Update state with service info
+            setState((prev) => ({
+              ...prev,
+              loading: false,
+              service: {
+                id: data.service.id,
+                title: data.service.title,
+                slug: data.service.slug,
+                description: '',
+                price: data.amountTotal || data.order.total || 0,
+              },
+              paymentOrderId: data.order.orderId || data.order.id,
+            }))
+
+            setPaymentStatus('succeeded')
+            return
+          }
+        } catch (err) {
+          console.error('Error verifying session:', err)
+        }
+      }
+
+      // Fallback: just show success if we have the param
+      setPaymentStatus('succeeded')
+      
+      // Update localStorage if we have an orderId
+      if (orderId) {
+        const orders = JSON.parse(localStorage.getItem('dztech_orders') || '[]')
+        const order = orders.find((o: { orderId: string }) => o.orderId === orderId)
+        if (order) {
+          order.status = 'paid'
+          order.paidAt = new Date().toISOString()
+          localStorage.setItem('dztech_orders', JSON.stringify(orders))
+        }
+      }
+    }
+
+    handleSuccessRedirect()
+  }, [successParam, sessionIdParam, orderId, serviceId])
 
   // Handle payment success - update localStorage and check for provider redirect
   useEffect(() => {
@@ -684,20 +805,36 @@ export function CheckoutClient() {
               </div>
             </div>
 
-            {/* Total */}
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-gray-900">Total</span>
-                <span className="text-2xl font-bold text-blue-500">
-                  USD {service.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </span>
+            {/* Total - only show for fixed-price (non-Buy Button) payments */}
+            {!service.stripeBuyButtonId && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-gray-900">Total</span>
+                  <span className="text-2xl font-bold text-blue-500">
+                    USD {service.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Payment Form */}
           <div className="px-6 pb-8">
-            {state.clientSecret ? (
+            {/* Use Stripe Buy Button if configured (for Payment Link analytics) */}
+            {service.stripeBuyButtonId ? (
+              <div className="stripe-buy-button-wrapper flex flex-col items-center">
+                <div className="w-full flex justify-center">
+                  <StripeBuyButton 
+                    buyButtonId={service.stripeBuyButtonId} 
+                    publishableKey={state.stripePublishableKey || undefined}
+                    clientReferenceId={state.paymentOrderId || displayOrderId || undefined}
+                  />
+                </div>
+                <p className="text-center text-xs text-gray-400 mt-4">
+                  Secure payment powered by Stripe
+                </p>
+              </div>
+            ) : state.clientSecret ? (
               <StripeProvider
                 clientSecret={state.clientSecret}
                 publishableKey={state.stripePublishableKey || undefined}

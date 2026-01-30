@@ -40,7 +40,7 @@ User clicks "Buy" → Generate Order ID → Checkout Page → Cash App → Same 
    - Stripe Elements integration for Cash App Pay
    - Returns to same checkout page after payment
 
-5. **Create Payment Intent API** (`src/app/api/create-payment-intent/route.ts`)
+5. **Create Payment Intent API** (`src/app/api/v1/create-payment-intent/route.ts`)
    - Creates Stripe PaymentIntent
    - Creates pending Order in database
    - Supports both serviceId and paymentLinkId flows
@@ -227,9 +227,8 @@ src/
 │   │   ├── CashAppPaymentForm.tsx # Cash App form
 │   │   └── StripeProvider.tsx     # Stripe Elements provider
 │   └── Service/
-│       └── BuyButton.tsx          # Buy button component
-├── hooks/
-│   └── manageStripePaymentLink.ts # Auto-create Payment Links
+│       ├── BuyButton.tsx          # Buy button component
+│       └── StripeBuyButton.tsx    # Stripe Buy Button (hosted checkout)
 ├── lib/
 │   ├── order-generator.ts         # Order ID utilities
 │   └── stripe.ts                  # Stripe utilities

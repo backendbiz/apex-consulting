@@ -1,6 +1,7 @@
 import { Hero, CTABanner, ContactForm } from '@/components/sections'
 import { Button, Icon, Card, type IconName } from '@/components/ui'
 import { BuyButton } from '@/components/Service/BuyButton'
+import { StripeBuyButton } from '@/components/Service/StripeBuyButton'
 import { getPayloadClient } from '@/lib/payload'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
@@ -145,7 +146,14 @@ export default async function ServicePage({ params }: Props) {
                   )}
                 </div>
 
-                <BuyButton serviceId={service.id} paymentLinkId={service.stripePaymentLinkId} />
+                {/* Use Stripe Buy Button if configured, otherwise use custom checkout */}
+                {service.stripeBuyButtonId ? (
+                  <div className="mb-4">
+                    <StripeBuyButton buyButtonId={service.stripeBuyButtonId} />
+                  </div>
+                ) : (
+                  <BuyButton serviceId={service.id} />
+                )}
 
                 <Button variant="outline" href="/contact" className="w-full">
                   Request Quote

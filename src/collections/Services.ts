@@ -1,6 +1,5 @@
 import type { CollectionConfig } from 'payload'
 import { revalidate } from '@/hooks/revalidate'
-import { manageStripePaymentLink } from '@/hooks/manageStripePaymentLink'
 
 export const Services: CollectionConfig = {
   slug: 'services',
@@ -11,10 +10,12 @@ export const Services: CollectionConfig = {
   },
   access: {
     read: () => true,
+    create: ({ req }) => Boolean(req.user),
+    update: ({ req }) => Boolean(req.user),
+    delete: ({ req }) => Boolean(req.user),
   },
   hooks: {
     afterChange: [revalidate],
-    beforeChange: [manageStripePaymentLink],
   },
   fields: [
     {
@@ -149,39 +150,14 @@ export const Services: CollectionConfig = {
         position: 'sidebar',
       },
     },
-    // Auto-generated Stripe Fields
+    // Stripe Buy Button ID - get from Stripe Dashboard → Payment Links
     {
-      name: 'stripeProductId',
+      name: 'stripeBuyButtonId',
       type: 'text',
-      admin: {
-        readOnly: true,
-        hidden: true,
-      },
-    },
-    {
-      name: 'stripePriceId',
-      type: 'text',
-      admin: {
-        readOnly: true,
-        hidden: true,
-      },
-    },
-    {
-      name: 'stripePaymentLinkId',
-      type: 'text',
-      admin: {
-        readOnly: true,
-        hidden: true,
-      },
-    },
-    {
-      name: 'stripePaymentLinkUrl',
-      type: 'text',
-      label: 'Payment Link URL',
+      label: 'Stripe Buy Button ID',
       admin: {
         position: 'sidebar',
-        readOnly: true,
-        description: 'Auto-generated Stripe Payment Link',
+        description: 'Enter Stripe Buy Button ID for hosted checkout (e.g., buy_btn_xxx). Get from Stripe Dashboard → Payment Links.',
       },
     },
   ],

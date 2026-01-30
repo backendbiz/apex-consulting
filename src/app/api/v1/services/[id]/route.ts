@@ -43,6 +43,7 @@ export async function GET(request: Request, { params }: Props) {
       icon: service.icon,
       slug: service.slug,
       features: service.features,
+      stripeBuyButtonId: service.stripeBuyButtonId || null,
     })
   } catch (error) {
     console.error('Error fetching service:', error)

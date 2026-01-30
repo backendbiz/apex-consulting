@@ -84,63 +84,111 @@ async function notifyProvider(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const checkoutSessionCompleted = async ({ event }: any) => {
   const session = event.data.object
-  const { serviceId } = session.metadata || {}
+  const { serviceId, providerId } = session.metadata || {}
   const paymentIntentId = session.payment_intent as string
+  // client_reference_id is set by Stripe Buy Button - contains our order ID
+  const clientReferenceId = session.client_reference_id as string | null
 
-  if (serviceId && paymentIntentId) {
-    const payload = await getPayloadClient()
+  const payload = await getPayloadClient()
 
-    try {
-      // Find order by payment intent ID
-      const existingOrders = await payload.find({
+  try {
+    let existingOrder: Order | null = null
+
+    // Strategy 1: Look for order by client_reference_id (Stripe Buy Button flow)
+    // This is the primary method for provider integrations using Buy Button
+    if (clientReferenceId) {
+      console.log(`Looking for order by client_reference_id: ${clientReferenceId}`)
+      
+      // Try finding by Payload ID first
+      try {
+        const orderById = await payload.findByID({
+          collection: 'orders',
+          id: clientReferenceId,
+          depth: 1,
+        })
+        if (orderById) {
+          existingOrder = orderById
+          console.log(`Found order by ID: ${clientReferenceId}`)
+        }
+      } catch {
+        // Not a valid Payload ID, try by orderId field
+        const ordersByOrderId = await payload.find({
+          collection: 'orders',
+          where: {
+            orderId: { equals: clientReferenceId },
+          },
+          depth: 1,
+        })
+        if (ordersByOrderId.docs.length > 0) {
+          existingOrder = ordersByOrderId.docs[0]
+          console.log(`Found order by orderId field: ${clientReferenceId}`)
+        }
+      }
+    }
+
+    // Strategy 2: Look for order by payment intent ID (standard flow)
+    if (!existingOrder && paymentIntentId) {
+      const ordersByPaymentIntent = await payload.find({
         collection: 'orders',
         where: {
           stripePaymentIntentId: { equals: paymentIntentId },
         },
-        depth: 1, // Populate provider and service
+        depth: 1,
       })
-
-      if (existingOrders.docs.length > 0) {
-        const existingOrder = existingOrders.docs[0]
-
-        // Update existing order
-        await payload.update({
-          collection: 'orders',
-          id: existingOrder.id,
-          data: {
-            status: 'paid',
-            stripeSessionId: session.id,
-            customerEmail: session.customer_details?.email || undefined,
-          },
-        })
-        console.log(`Order ${existingOrder.id} updated to paid status`)
-
-        // Notify provider if applicable
-        if (existingOrder.provider && typeof existingOrder.provider === 'object') {
-          await notifyProvider(
-            existingOrder.provider as Provider,
-            { ...existingOrder, status: 'paid' },
-            'payment_succeeded',
-          )
-        }
-      } else {
-        // Create new order
-        const newOrder = await payload.create({
-          collection: 'orders',
-          data: {
-            service: serviceId,
-            status: 'paid',
-            total: session.amount_total / 100,
-            stripeSessionId: session.id,
-            stripePaymentIntentId: paymentIntentId,
-            customerEmail: session.customer_details?.email || undefined,
-          },
-        })
-        console.log(`Order ${newOrder.id} created for session ${session.id}`)
+      if (ordersByPaymentIntent.docs.length > 0) {
+        existingOrder = ordersByPaymentIntent.docs[0]
+        console.log(`Found order by stripePaymentIntentId: ${paymentIntentId}`)
       }
-    } catch (error) {
-      console.error('Error creating/updating order:', error)
     }
+
+    if (existingOrder) {
+      // Update existing order to paid
+      await payload.update({
+        collection: 'orders',
+        id: existingOrder.id,
+        data: {
+          status: 'paid',
+          stripeSessionId: session.id,
+          // Update with real payment intent ID (replaces placeholder for Buy Button flow)
+          ...(paymentIntentId && { stripePaymentIntentId: paymentIntentId }),
+          customerEmail: session.customer_details?.email || undefined,
+        },
+      })
+      console.log(`Order ${existingOrder.id} updated to paid status via checkout.session.completed`)
+
+      // Notify provider if applicable
+      const orderProvider = existingOrder.provider
+      if (orderProvider && typeof orderProvider === 'object') {
+        await notifyProvider(
+          orderProvider as Provider,
+          { ...existingOrder, status: 'paid' },
+          'payment_succeeded',
+        )
+      }
+    } else if (serviceId) {
+      // Create new order if no existing order found (direct Payment Link without API flow)
+      const newOrder = await payload.create({
+        collection: 'orders',
+        data: {
+          service: serviceId,
+          status: 'paid',
+          total: session.amount_total / 100,
+          stripeSessionId: session.id,
+          stripePaymentIntentId: paymentIntentId,
+          customerEmail: session.customer_details?.email || undefined,
+          ...(providerId && { provider: providerId }),
+          ...(clientReferenceId && { orderId: clientReferenceId }),
+        },
+      })
+      console.log(`Order ${newOrder.id} created for session ${session.id}`)
+    } else {
+      console.warn(
+        `checkout.session.completed: No order found and no serviceId in metadata. ` +
+        `client_reference_id=${clientReferenceId}, payment_intent=${paymentIntentId}`
+      )
+    }
+  } catch (error) {
+    console.error('Error creating/updating order:', error)
   }
 }
 

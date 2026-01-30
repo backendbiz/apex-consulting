@@ -573,13 +573,10 @@ export interface Service {
   order?: number | null;
   status: 'draft' | 'published';
   featured?: boolean | null;
-  stripeProductId?: string | null;
-  stripePriceId?: string | null;
-  stripePaymentLinkId?: string | null;
   /**
-   * Auto-generated Stripe Payment Link
+   * Enter Stripe Buy Button ID for hosted checkout (e.g., buy_btn_xxx). Get from Stripe Dashboard → Payment Links.
    */
-  stripePaymentLinkUrl?: string | null;
+  stripeBuyButtonId?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -687,6 +684,10 @@ export interface Provider {
    * Only active providers can process payments
    */
   status: 'active' | 'inactive';
+  /**
+   * When enabled, redirects users directly to Stripe's hosted checkout page instead of the custom checkout. Supports custom amounts.
+   */
+  useStripeCheckout?: boolean | null;
   /**
    * URL to notify when a payment is completed (POST request with payment details)
    */
@@ -1230,10 +1231,7 @@ export interface ServicesSelect<T extends boolean = true> {
   order?: T;
   status?: T;
   featured?: T;
-  stripeProductId?: T;
-  stripePriceId?: T;
-  stripePaymentLinkId?: T;
-  stripePaymentLinkUrl?: T;
+  stripeBuyButtonId?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1338,6 +1336,7 @@ export interface ProvidersSelect<T extends boolean = true> {
   apiKey?: T;
   service?: T;
   status?: T;
+  useStripeCheckout?: T;
   webhookUrl?: T;
   successRedirectUrl?: T;
   cancelRedirectUrl?: T;

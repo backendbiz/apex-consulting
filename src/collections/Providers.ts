@@ -83,6 +83,17 @@ export const Providers: CollectionConfig = {
       },
     },
     {
+      name: 'useStripeCheckout',
+      type: 'checkbox',
+      defaultValue: false,
+      label: 'Use Stripe Hosted Checkout',
+      admin: {
+        position: 'sidebar',
+        description:
+          'When enabled, redirects users directly to Stripe\'s hosted checkout page instead of the custom checkout. Supports custom amounts.',
+      },
+    },
+    {
       name: 'webhookUrl',
       type: 'text',
       label: 'Webhook URL',

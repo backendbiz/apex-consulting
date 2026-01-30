@@ -183,6 +183,7 @@ export async function POST(req: Request) {
     let successRedirectUrl: string | undefined
     let cancelRedirectUrl: string | undefined
     let resolvedPaymentLinkId: string | undefined // Track which Payment Link was used
+    let useStripeCheckout: boolean = false // Flag for Stripe hosted checkout
 
     // Check if we are resuming an existing order
     let existingOrder: Order | null = null
@@ -294,8 +295,11 @@ export async function POST(req: Request) {
       providerName = providerResult.provider.name
       successRedirectUrl = providerResult.provider.successRedirectUrl || undefined
       cancelRedirectUrl = providerResult.provider.cancelRedirectUrl || undefined
+      useStripeCheckout = providerResult.provider.useStripeCheckout || false
 
-      console.log(`Provider "${providerName}" authenticated, using service: ${service.title}`)
+      console.log(
+        `Provider "${providerName}" authenticated, using service: ${service.title}, stripeCheckout: ${useStripeCheckout}`,
+      )
     } else if (body.paymentLinkId) {
       // === Payment Link Flow ===
       // Resolve details from Stripe Payment Link
@@ -489,7 +493,7 @@ export async function POST(req: Request) {
       finalAmount = requestedAmount
     }
 
-    // Create idempotency key to prevent duplicate PaymentIntents
+    // Create idempotency key to prevent duplicate PaymentIntents/Sessions
     // Priority: externalId (provider) > incomingOrderId (client) > random (fallback)
     let idempotencyKey: string
     if (externalId) {
@@ -501,6 +505,65 @@ export async function POST(req: Request) {
     } else {
       // Fallback: random (shouldn't normally happen)
       idempotencyKey = `pi_${service.id}_${Date.now()}_${Math.random().toString(36).substring(7)}`
+    }
+
+    // === STRIPE BUY BUTTON FLOW ===
+    // When useStripeCheckout is enabled, redirect to DZTech checkout page
+    // which will display the Stripe Buy Button for Payment Link analytics
+    if (useStripeCheckout && apiKey) {
+      // Check if service has a Buy Button ID configured
+      if (!service.stripeBuyButtonId) {
+        return NextResponse.json(
+          {
+            error: 'Stripe Buy Button not configured for this service',
+            details: 'Please add a Stripe Buy Button ID to the service in the admin panel.',
+          },
+          { status: 400 },
+        )
+      }
+
+      // Generate a client reference ID for tracking
+      const clientReferenceId = externalId || incomingOrderId || `order_${Date.now()}`
+
+      console.log(`Provider "${providerName}" using Stripe Buy Button flow`)
+
+      // Create a pending order for tracking
+      let orderId: string = clientReferenceId
+      try {
+        const order = await payload.create({
+          collection: 'orders',
+          data: {
+            service: service.id,
+            status: 'pending',
+            total: service.price, // Buy Button uses fixed service price
+            quantity: 1,
+            stripePaymentIntentId: `buybutton_${clientReferenceId}`, // Placeholder until webhook confirms
+            orderId: clientReferenceId,
+            ...(providerId && { provider: providerId }),
+            ...(externalId && { externalId }),
+          },
+        })
+        orderId = order.id
+        console.log(`Created pending order ${orderId} for Buy Button flow`)
+      } catch (dbError) {
+        console.error('Failed to create order for Buy Button:', dbError)
+        // Continue anyway - we can reconcile via webhooks
+      }
+
+      // Return the DZTech checkout URL
+      // The checkout page will show the Stripe Buy Button
+      const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'https://app.dztech.shop'
+      const checkoutUrl = `${baseUrl}/checkout?serviceId=${service.id}&orderId=${orderId}`
+
+      return NextResponse.json({
+        checkoutUrl,
+        orderId: orderId,
+        externalId: externalId || null,
+        amount: service.price, // Buy Button uses fixed price
+        quantity: 1,
+        stripeBuyButtonId: service.stripeBuyButtonId,
+        mode: 'stripe_buy_button',
+      })
     }
 
     // Build a descriptive description for easy identification in Stripe Dashboard

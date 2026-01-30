@@ -200,7 +200,7 @@ Before saving, the system validates:
 
 ## API Reference
 
-### POST `/api/create-payment-intent`
+### POST `/api/v1/create-payment-intent`
 
 Creates a Payment Intent for the checkout flow.
 
