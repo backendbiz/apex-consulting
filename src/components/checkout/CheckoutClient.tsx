@@ -95,6 +95,14 @@ export function CheckoutClient() {
         return
       }
 
+      // Skip initialization if returning from Cash App redirect
+      // The verifyPaymentStatus effect will handle showing success/failure UI
+      if (paymentIntentParam && paymentIntentClientSecret) {
+        console.log('Cash App redirect detected, skipping normal initialization')
+        setState((prev) => ({ ...prev, loading: false }))
+        return
+      }
+
       if (!serviceId && !paymentLinkId) {
         setState((prev) => ({
           ...prev,
@@ -253,7 +261,7 @@ export function CheckoutClient() {
     }
 
     initializeCheckout()
-  }, [serviceId, orderId, paymentLinkId, successParam, sessionIdParam, cancelledParam])
+  }, [serviceId, orderId, paymentLinkId, successParam, sessionIdParam, cancelledParam, paymentIntentParam, paymentIntentClientSecret])
 
   // Store order ID and provider info in localStorage
   useEffect(() => {
