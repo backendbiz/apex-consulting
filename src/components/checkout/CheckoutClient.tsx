@@ -55,8 +55,9 @@ export function CheckoutClient() {
   const paymentIntentParam = searchParams.get('payment_intent')
   const paymentIntentClientSecret = searchParams.get('payment_intent_client_secret')
   
-  // Stripe Buy Button / Payment Link success redirect params
+  // Stripe Buy Button / Payment Link redirect params
   const successParam = searchParams.get('success')
+  const cancelledParam = searchParams.get('cancelled')
   const sessionIdParam = searchParams.get('session_id')
 
   const [state, setState] = useState<CheckoutState>({
@@ -82,10 +83,15 @@ export function CheckoutClient() {
   // Note: Duplicate calls are safely handled by Stripe's idempotency key on the backend
   useEffect(() => {
     async function initializeCheckout() {
-      // Skip normal initialization if this is a success redirect from Stripe Buy Button
-      // The success handler will take care of fetching session details
+      // Skip normal initialization if this is a redirect from Stripe Buy Button
+      // The success/cancelled handlers will take care of it
       if (successParam === 'true' && sessionIdParam) {
         console.log('Success redirect detected, skipping normal initialization')
+        return
+      }
+      
+      if (cancelledParam === 'true') {
+        console.log('Cancelled redirect detected, skipping normal initialization')
         return
       }
 
@@ -247,7 +253,7 @@ export function CheckoutClient() {
     }
 
     initializeCheckout()
-  }, [serviceId, orderId, paymentLinkId, successParam, sessionIdParam])
+  }, [serviceId, orderId, paymentLinkId, successParam, sessionIdParam, cancelledParam])
 
   // Store order ID and provider info in localStorage
   useEffect(() => {
@@ -401,6 +407,19 @@ export function CheckoutClient() {
 
     handleSuccessRedirect()
   }, [successParam, sessionIdParam, orderId, serviceId])
+
+  // Handle Stripe Buy Button / Payment Link cancelled/failed redirect
+  useEffect(() => {
+    if (cancelledParam === 'true') {
+      console.log('Stripe Buy Button payment cancelled/failed')
+      setPaymentStatus('failed')
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: 'Payment was cancelled or failed. Please try again.',
+      }))
+    }
+  }, [cancelledParam])
 
   // Handle payment success - update localStorage and check for provider redirect
   useEffect(() => {
@@ -673,6 +692,9 @@ export function CheckoutClient() {
                 url.searchParams.delete('redirect_status')
                 url.searchParams.delete('payment_intent')
                 url.searchParams.delete('payment_intent_client_secret')
+                url.searchParams.delete('cancelled')
+                url.searchParams.delete('success')
+                url.searchParams.delete('session_id')
                 window.location.href = url.toString()
               }}
               className="w-full py-3 px-4 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition-colors"
